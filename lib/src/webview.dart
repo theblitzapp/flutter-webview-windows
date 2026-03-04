@@ -649,6 +649,8 @@ class _WebviewState extends State<Webview> {
 
   StreamSubscription? _cursorSubscription;
 
+  int _updateSizeRequestId = 0;
+
   @override
   void initState() {
     super.initState();
@@ -753,13 +755,29 @@ class _WebviewState extends State<Webview> {
         ));
   }
 
-  void _updateSurfaceSize(Size size) async {
-    await _controller.ready;
+  void _updateSurfaceSize(Size size) {
+    _updateSizeRequestId++;
 
-    unawaited(_controller._setSize(
+    if (!_controller._creatingCompleter.isCompleted) {
+      final requestId = _updateSizeRequestId;
+
+      _controller.ready.then((_) {
+        if (!mounted) {
+          return;
+        }
+
+        if (requestId != _updateSizeRequestId) {
+          return;
+        }
+
+        _updateSurfaceSize(size);
+      });
+    }
+
+    _controller._setSize(
       size,
       widget.scaleFactor ?? window.devicePixelRatio,
-    ));
+    );
   }
 
   @override
