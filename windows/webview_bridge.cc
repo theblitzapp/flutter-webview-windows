@@ -155,9 +155,23 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
   texture_id_ = texture_registrar->RegisterTexture(flutter_texture_.get());
   texture_bridge_->SetOnFrameAvailable(
       [this]() { texture_registrar_->MarkTextureFrameAvailable(texture_id_); });
-  // texture_bridge_->SetOnSurfaceSizeChanged([this](Size size) {
-  //  webview_->SetSurfaceSize(size.width, size.height);
-  //});
+
+  texture_bridge_->SetOnFrameSizeChanged([this](size_t width, size_t height) {
+    const auto event = flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue(kEventType),
+         flutter::EncodableValue("frameSizeChanged")},
+        {flutter::EncodableValue(kEventValue),
+         flutter::EncodableValue(flutter::EncodableMap{
+             {flutter::EncodableValue("width"),
+              flutter::EncodableValue(static_cast<int64_t>(width))},
+             {flutter::EncodableValue("height"),
+              flutter::EncodableValue(static_cast<int64_t>(height))},
+         })},
+    });
+    EmitEvent(event);
+  });
+
+  webview_->SetSurfaceSize(71, 71, 1.0f);
 
   const auto method_channel_name =
       std::format("io.jns.webview.win/{}", texture_id_);
@@ -181,11 +195,15 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
       [this](const flutter::EncodableValue* arguments,
              std::unique_ptr<flutter::EventSink<flutter::EncodableValue>>&&
                  events) {
-        event_sink_ = std::move(events);
+        {
+          std::lock_guard<std::mutex> lock(event_sink_mutex_);
+          event_sink_ = std::move(events);
+        }
         RegisterEventHandlers();
         return nullptr;
       },
       [this](const flutter::EncodableValue* arguments) {
+        std::lock_guard<std::mutex> lock(event_sink_mutex_);
         event_sink_ = nullptr;
         return nullptr;
       });
@@ -324,8 +342,7 @@ void WebviewBridge::RegisterEventHandlers() {
 }
 
 void WebviewBridge::OnPermissionRequested(
-    const std::string& url,
-    WebviewPermissionKind permissionKind,
+    const std::string& url, WebviewPermissionKind permissionKind,
     bool isUserInitiated,
     Webview::WebviewPermissionRequestedCompleter completer) {
   auto args = std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{

@@ -135,6 +135,16 @@ void TextureBridge::OnFrameArrived() {
     needs_update_ = false;
   }
 
+  if (has_frame && last_frame_ && on_frame_size_changed_) {
+    D3D11_TEXTURE2D_DESC desc;
+    last_frame_->GetDesc(&desc);
+    if (desc.Width != last_emitted_frame_size_.width ||
+        desc.Height != last_emitted_frame_size_.height) {
+      last_emitted_frame_size_ = {desc.Width, desc.Height};
+      on_frame_size_changed_(desc.Width, desc.Height);
+    }
+  }
+
   if (has_frame && frame_available_) {
     frame_available_();
   }

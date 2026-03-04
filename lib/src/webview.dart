@@ -182,6 +182,11 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Stream<bool> get containsFullScreenElementChanged =>
       _containsFullScreenElementChangedStreamController.stream;
 
+  final StreamController<Size> _frameSizeStreamController =
+      StreamController<Size>.broadcast();
+
+  Stream<Size> get _frameSize => _frameSizeStreamController.stream;
+
   WebviewController() : super(WebviewValue.uninitialized());
 
   /// Initializes the underlying platform view.
@@ -246,6 +251,13 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             break;
           case 'containsFullScreenElementChanged':
             _containsFullScreenElementChangedStreamController.add(map['value']);
+            break;
+          case 'frameSizeChanged':
+            final value = map['value'];
+            _frameSizeStreamController.add(Size(
+              (value['width'] as int).toDouble(),
+              (value['height'] as int).toDouble(),
+            ));
             break;
         }
       });
@@ -735,12 +747,13 @@ class _WebviewState extends State<Webview> {
           child: RenderWebview(
             textureId: _controller._textureId,
             filterQuality: widget.filterQuality,
-            onSizeChanged: _reportSurfaceSize,
+            frameSize: _controller._frameSize,
+            onSizeChanged: _updateSurfaceSize,
           ),
         ));
   }
 
-  void _reportSurfaceSize(Size size) async {
+  void _updateSurfaceSize(Size size) async {
     await _controller.ready;
 
     unawaited(_controller._setSize(

@@ -3,6 +3,7 @@
 #include <windows.graphics.capture.h>
 #include <wrl.h>
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -40,6 +41,10 @@ class TextureBridge {
   void NotifySurfaceSizeChanged();
   void SetFpsLimit(std::optional<int> max_fps);
 
+  void SetOnFrameSizeChanged(std::function<void(size_t, size_t)> callback) {
+    on_frame_size_changed_ = std::move(callback);
+  }
+
  protected:
   bool is_running_ = false;
 
@@ -49,6 +54,8 @@ class TextureBridge {
 
   FrameAvailableCallback frame_available_;
   SurfaceSizeChangedCallback surface_size_changed_;
+  std::function<void(size_t, size_t)> on_frame_size_changed_;
+  Size last_emitted_frame_size_{0, 0};
   std::atomic<bool> needs_update_ = false;
   winrt::com_ptr<ID3D11Texture2D> last_frame_;
   std::optional<std::chrono::high_resolution_clock::time_point>

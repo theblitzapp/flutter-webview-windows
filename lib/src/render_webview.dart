@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -6,11 +8,13 @@ class RenderWebview extends LeafRenderObjectWidget {
     Key? key,
     required this.textureId,
     required this.filterQuality,
+    required this.frameSize,
     required this.onSizeChanged,
   }) : super(key: key);
 
   final int textureId;
   final FilterQuality filterQuality;
+  final Stream<Size> frameSize;
   final void Function(Size) onSizeChanged;
 
   @override
@@ -18,6 +22,7 @@ class RenderWebview extends LeafRenderObjectWidget {
     return WebviewBox(
         textureId: textureId,
         filterQuality: filterQuality,
+        frameSize: frameSize,
         onSizeChanged: onSizeChanged);
   }
 
@@ -26,6 +31,7 @@ class RenderWebview extends LeafRenderObjectWidget {
     renderObject.textureId = textureId;
     renderObject.filterQuality = filterQuality;
     renderObject.onSizeChanged = onSizeChanged;
+    renderObject.frameSize = frameSize;
   }
 }
 
@@ -33,13 +39,38 @@ class WebviewBox extends RenderBox {
   WebviewBox({
     required int textureId,
     FilterQuality filterQuality = FilterQuality.low,
+    required Stream<Size> frameSize,
     required this.onSizeChanged,
   })  : _textureId = textureId,
-        _filterQuality = filterQuality;
+        _filterQuality = filterQuality,
+        _frameSize = frameSize;
 
   void Function(Size) onSizeChanged;
 
-  Size? _lastSize;
+  Size? _lastNotifiedSize;
+
+  Size? _currentFrameSize;
+  StreamSubscription<Size>? _frameSizeSubscription;
+
+  Stream<Size> get frameSize => _frameSize;
+  Stream<Size> _frameSize;
+  set frameSize(Stream<Size> value) {
+    if (value != _frameSize) {
+      _frameSize = value;
+
+      if (_frameSizeSubscription != null) {
+        _frameSizeSubscription?.cancel();
+
+        _frameSizeSubscription = _frameSize.listen((size) {
+          if (!attached) {
+            return;
+          }
+
+          markNeedsPaint();
+        });
+      }
+    }
+  }
 
   int get textureId => _textureId;
   int _textureId;
@@ -76,7 +107,8 @@ class WebviewBox extends RenderBox {
 
   @override
   void performLayout() {
-    if (_lastSize != size) {
+    if (_lastNotifiedSize != size) {
+      _lastNotifiedSize = size;
       onSizeChanged(size);
     }
   }
@@ -86,25 +118,36 @@ class WebviewBox extends RenderBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    final paintSize = _currentFrameSize ?? size;
     context.addLayer(
       TextureLayer(
-        rect: Rect.fromLTWH(offset.dx, offset.dy, size.width, size.height),
+        rect: Rect.fromLTWH(
+            offset.dx, offset.dy, paintSize.width, paintSize.height),
         textureId: _textureId,
         filterQuality: _filterQuality,
       ),
     );
   }
 
-  // @override
-  // void paint(PaintingContext context, Offset offset) {
-  //   if (child == null) return;
-  //   // Clip the child to our bounds so oversized stale content is hidden
-  //   // when shrinking, and expanding shows transparent/background padding.
-  //   context.pushClipRect(
-  //     needsCompositing,
-  //     offset,
-  //     Offset.zero & size,
-  //     super.paint,
-  //   );
-  // }
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+
+    _frameSizeSubscription = _frameSize.listen((physicalSize) {
+      if (!attached) {
+        return;
+      }
+
+      _currentFrameSize = physicalSize;
+      markNeedsPaint();
+    });
+  }
+
+  @override
+  void detach() {
+    super.detach();
+
+    _frameSizeSubscription?.cancel();
+    _frameSizeSubscription = null;
+  }
 }
