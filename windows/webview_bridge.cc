@@ -179,14 +179,12 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
              std::unique_ptr<flutter::EventSink<flutter::EncodableValue>>&&
                  events) {
         {
-          std::lock_guard<std::mutex> lock(event_sink_mutex_);
           event_sink_ = std::move(events);
         }
         RegisterEventHandlers();
         return nullptr;
       },
       [this](const flutter::EncodableValue* arguments) {
-        std::lock_guard<std::mutex> lock(event_sink_mutex_);
         event_sink_ = nullptr;
         return nullptr;
       });

@@ -28,7 +28,6 @@ class WebviewBridge {
   std::unique_ptr<flutter::TextureVariant> flutter_texture_;
   std::unique_ptr<TextureBridge> texture_bridge_;
   std::unique_ptr<Webview> webview_;
-  std::mutex event_sink_mutex_;
   std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> event_sink_;
   std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>>
       event_channel_;
@@ -45,7 +44,6 @@ class WebviewBridge {
 
   template <typename T>
   void EmitEvent(const T& value) {
-    std::lock_guard<std::mutex> lock(event_sink_mutex_);
     if (event_sink_) {
       event_sink_->Success(value);
     }
