@@ -667,76 +667,76 @@ class _WebviewState extends State<Webview> {
     if (!_controller.value.isInitialized) {
       return const SizedBox.shrink();
     }
-    return RenderWebview(
-        onSizeChanged: _reportSurfaceSize,
-        child: Listener(
-          onPointerHover: (ev) {
-            // ev.kind is for whatever reason not set to touch
-            // even on touch input
-            if (_pointerKind == PointerDeviceKind.touch) {
-              // Ignoring hover events on touch for now
-              return;
-            }
+
+    return Listener(
+        onPointerHover: (ev) {
+          // ev.kind is for whatever reason not set to touch
+          // even on touch input
+          if (_pointerKind == PointerDeviceKind.touch) {
+            // Ignoring hover events on touch for now
+            return;
+          }
+          _controller._setCursorPos(ev.localPosition);
+        },
+        onPointerDown: (ev) {
+          _pointerKind = ev.kind;
+          if (ev.kind == PointerDeviceKind.touch) {
+            _controller._setPointerUpdate(WebviewPointerEventKind.down,
+                ev.pointer, ev.localPosition, ev.size, ev.pressure);
+            return;
+          }
+          final button = getButton(ev.buttons);
+          _downButtons[ev.pointer] = button;
+          _controller._setPointerButtonState(button, true);
+        },
+        onPointerUp: (ev) {
+          _pointerKind = ev.kind;
+          if (ev.kind == PointerDeviceKind.touch) {
+            _controller._setPointerUpdate(WebviewPointerEventKind.up,
+                ev.pointer, ev.localPosition, ev.size, ev.pressure);
+            return;
+          }
+          final button = _downButtons.remove(ev.pointer);
+          if (button != null) {
+            _controller._setPointerButtonState(button, false);
+          }
+        },
+        onPointerCancel: (ev) {
+          _pointerKind = ev.kind;
+          final button = _downButtons.remove(ev.pointer);
+          if (button != null) {
+            _controller._setPointerButtonState(button, false);
+          }
+        },
+        onPointerMove: (ev) {
+          _pointerKind = ev.kind;
+          if (ev.kind == PointerDeviceKind.touch) {
+            _controller._setPointerUpdate(WebviewPointerEventKind.update,
+                ev.pointer, ev.localPosition, ev.size, ev.pressure);
+          } else {
             _controller._setCursorPos(ev.localPosition);
-          },
-          onPointerDown: (ev) {
-            _pointerKind = ev.kind;
-            if (ev.kind == PointerDeviceKind.touch) {
-              _controller._setPointerUpdate(WebviewPointerEventKind.down,
-                  ev.pointer, ev.localPosition, ev.size, ev.pressure);
-              return;
-            }
-            final button = getButton(ev.buttons);
-            _downButtons[ev.pointer] = button;
-            _controller._setPointerButtonState(button, true);
-          },
-          onPointerUp: (ev) {
-            _pointerKind = ev.kind;
-            if (ev.kind == PointerDeviceKind.touch) {
-              _controller._setPointerUpdate(WebviewPointerEventKind.up,
-                  ev.pointer, ev.localPosition, ev.size, ev.pressure);
-              return;
-            }
-            final button = _downButtons.remove(ev.pointer);
-            if (button != null) {
-              _controller._setPointerButtonState(button, false);
-            }
-          },
-          onPointerCancel: (ev) {
-            _pointerKind = ev.kind;
-            final button = _downButtons.remove(ev.pointer);
-            if (button != null) {
-              _controller._setPointerButtonState(button, false);
-            }
-          },
-          onPointerMove: (ev) {
-            _pointerKind = ev.kind;
-            if (ev.kind == PointerDeviceKind.touch) {
-              _controller._setPointerUpdate(WebviewPointerEventKind.update,
-                  ev.pointer, ev.localPosition, ev.size, ev.pressure);
-            } else {
-              _controller._setCursorPos(ev.localPosition);
-            }
-          },
-          onPointerSignal: (signal) {
-            if (signal is PointerScrollEvent) {
-              _controller._setScrollDelta(
-                  -signal.scrollDelta.dx, -signal.scrollDelta.dy);
-            }
-          },
-          onPointerPanZoomUpdate: (signal) {
-            if (signal.panDelta.dx.abs() > signal.panDelta.dy.abs()) {
-              _controller._setScrollDelta(-signal.panDelta.dx, 0);
-            } else {
-              _controller._setScrollDelta(0, signal.panDelta.dy);
-            }
-          },
-          child: MouseRegion(
-              cursor: _cursor,
-              child: Texture(
-                textureId: _controller._textureId,
-                filterQuality: widget.filterQuality,
-              )),
+          }
+        },
+        onPointerSignal: (signal) {
+          if (signal is PointerScrollEvent) {
+            _controller._setScrollDelta(
+                -signal.scrollDelta.dx, -signal.scrollDelta.dy);
+          }
+        },
+        onPointerPanZoomUpdate: (signal) {
+          if (signal.panDelta.dx.abs() > signal.panDelta.dy.abs()) {
+            _controller._setScrollDelta(-signal.panDelta.dx, 0);
+          } else {
+            _controller._setScrollDelta(0, signal.panDelta.dy);
+          }
+        },
+        child: MouseRegion(
+          cursor: _cursor,
+          child: RenderWebview(
+            textureId: _controller._textureId,
+            filterQuality: widget.filterQuality,
+            onSizeChanged: _reportSurfaceSize,
+          ),
         ));
   }
 
@@ -744,7 +744,9 @@ class _WebviewState extends State<Webview> {
     await _controller.ready;
 
     unawaited(_controller._setSize(
-        size, widget.scaleFactor ?? window.devicePixelRatio));
+      size,
+      widget.scaleFactor ?? window.devicePixelRatio,
+    ));
   }
 
   @override
