@@ -175,8 +175,9 @@ void TextureBridge::OnFrameArrived() {
     if (pool_size_.width > static_cast<size_t>(size.Width) * 2 ||
         pool_size_.height > static_cast<size_t>(size.Height) * 2) {
       ABI::Windows::Graphics::SizeInt32 new_size;
-      new_size.Width = size.Width * kPoolHeadroomMultiplier;
-      new_size.Height = size.Height * kPoolHeadroomMultiplier;
+      new_size.Width = static_cast<INT32>(size.Width * kPoolHeadroomMultiplier);
+      new_size.Height =
+          static_cast<INT32>(size.Height * kPoolHeadroomMultiplier);
 
       frame_pool_->Recreate(
           graphics_context_->device(),
