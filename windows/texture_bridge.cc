@@ -142,6 +142,9 @@ void TextureBridge::OnFrameArrived() {
     ABI::Windows::Graphics::SizeInt32 size;
     capture_item_->get_Size(&size);
 
+    // If there's not enough space in the pool, resize it. We give it a bit of
+    // extra space to avoid resizing too often, which easily occurs if you are
+    // resizing the app window.
     if (static_cast<size_t>(size.Width) > pool_size_.width ||
         static_cast<size_t>(size.Height) > pool_size_.height) {
       ABI::Windows::Graphics::SizeInt32 new_size;
@@ -167,11 +170,13 @@ void TextureBridge::OnFrameArrived() {
     ABI::Windows::Graphics::SizeInt32 size;
     capture_item_->get_Size(&size);
 
+    // If the extra headroom is very large compared to the actual content size,
+    // reduce it to save on memory.
     if (pool_size_.width > static_cast<size_t>(size.Width) * 2 ||
         pool_size_.height > static_cast<size_t>(size.Height) * 2) {
       ABI::Windows::Graphics::SizeInt32 new_size;
-      new_size.Width = size.Width;
-      new_size.Height = size.Height;
+      new_size.Width = size.Width * kPoolHeadroomMultiplier;
+      new_size.Height = size.Height * kPoolHeadroomMultiplier;
 
       frame_pool_->Recreate(
           graphics_context_->device(),

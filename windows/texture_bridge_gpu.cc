@@ -29,6 +29,8 @@ void TextureBridgeGpu::ProcessFrame(winrt::com_ptr<ID3D11Texture2D> src_texture,
 
   auto device_context = graphics_context_->d3d_device_context();
 
+  // If the requested size is the same as the texture size, copy the texture
+  // directly to the surface.
   if (effective_width == requested_width &&
       effective_height == requested_height && desc.Width == requested_width &&
       desc.Height == requested_height) {
@@ -42,6 +44,9 @@ void TextureBridgeGpu::ProcessFrame(winrt::com_ptr<ID3D11Texture2D> src_texture,
     src_box.back = 1;
 
     if (src_box.right > 0 && src_box.bottom > 0) {
+      // Since we're not copying the entire texture (due to it being larger than
+      // the requested size), we need to copy a subset of the texture to the
+      // surface.
       device_context->CopySubresourceRegion(surface_.get(), 0, 0, 0, 0,
                                             src_texture.get(), 0, &src_box);
     }
