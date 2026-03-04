@@ -15,31 +15,38 @@ TextureBridgeGpu::TextureBridgeGpu(
 }
 
 void TextureBridgeGpu::ProcessFrame(winrt::com_ptr<ID3D11Texture2D> src_texture,
+                                    size_t content_width, size_t content_height,
                                     size_t requested_width,
                                     size_t requested_height) {
   D3D11_TEXTURE2D_DESC desc;
   src_texture->GetDesc(&desc);
+
+  auto effective_width =
+      (std::min)(content_width, static_cast<size_t>(desc.Width));
+  auto effective_height =
+      (std::min)(content_height, static_cast<size_t>(desc.Height));
 
   EnsureSurface(static_cast<uint32_t>(requested_width),
                 static_cast<uint32_t>(requested_height));
 
   auto device_context = graphics_context_->d3d_device_context();
 
-  if (desc.Width == requested_width && desc.Height == requested_height) {
+  if (effective_width == requested_width &&
+      effective_height == requested_height && desc.Width == requested_width &&
+      desc.Height == requested_height) {
     device_context->CopyResource(surface_.get(), src_texture.get());
   } else {
-    if (surface_rtv_) {
-      const float transparent[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-      device_context->ClearRenderTargetView(surface_rtv_.get(), transparent);
-    }
-
     D3D11_BOX src_box = {};
-    src_box.right = (std::min)(desc.Width, static_cast<UINT>(requested_width));
-    src_box.bottom = (std::min)(desc.Height, static_cast<UINT>(requested_height));
+    src_box.right =
+        static_cast<UINT>((std::min)(effective_width, requested_width));
+    src_box.bottom =
+        static_cast<UINT>((std::min)(effective_height, requested_height));
     src_box.back = 1;
 
-    device_context->CopySubresourceRegion(surface_.get(), 0, 0, 0, 0,
-                                          src_texture.get(), 0, &src_box);
+    if (src_box.right > 0 && src_box.bottom > 0) {
+      device_context->CopySubresourceRegion(surface_.get(), 0, 0, 0, 0,
+                                            src_texture.get(), 0, &src_box);
+    }
   }
 
   device_context->Flush();
@@ -62,15 +69,11 @@ void TextureBridgeGpu::EnsureSurface(uint32_t width, uint32_t height) {
     dstDesc.Usage = D3D11_USAGE_DEFAULT;
 
     surface_ = nullptr;
-    surface_rtv_ = nullptr;
     if (!SUCCEEDED(graphics_context_->d3d_device()->CreateTexture2D(
             &dstDesc, nullptr, surface_.put()))) {
       std::cerr << "Creating intermediate texture failed" << std::endl;
       return;
     }
-
-    graphics_context_->d3d_device()->CreateRenderTargetView(
-        surface_.get(), nullptr, surface_rtv_.put());
 
     HANDLE shared_handle;
     surface_.try_as(dxgi_surface_);
@@ -99,7 +102,8 @@ TextureBridgeGpu::GetSurfaceDescriptor(size_t width, size_t height) {
   }
 
   if (last_frame_) {
-    ProcessFrame(last_frame_, width, height);
+    ProcessFrame(last_frame_, last_content_size_.width,
+                 last_content_size_.height, width, height);
   }
 
   if (surface_) {
@@ -116,5 +120,4 @@ void TextureBridgeGpu::StopInternal() {
   // For some reason, the destination surface needs to be recreated upon
   // resuming. Force |EnsureSurface| to create a new one by resetting it here.
   surface_ = nullptr;
-  surface_rtv_ = nullptr;
 }

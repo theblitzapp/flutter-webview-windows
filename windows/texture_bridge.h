@@ -41,10 +41,6 @@ class TextureBridge {
   void NotifySurfaceSizeChanged();
   void SetFpsLimit(std::optional<int> max_fps);
 
-  void SetOnFrameSizeChanged(std::function<void(size_t, size_t)> callback) {
-    on_frame_size_changed_ = std::move(callback);
-  }
-
  protected:
   bool is_running_ = false;
 
@@ -54,10 +50,10 @@ class TextureBridge {
 
   FrameAvailableCallback frame_available_;
   SurfaceSizeChangedCallback surface_size_changed_;
-  std::function<void(size_t, size_t)> on_frame_size_changed_;
-  Size last_emitted_frame_size_{0, 0};
   std::atomic<bool> needs_update_ = false;
   winrt::com_ptr<ID3D11Texture2D> last_frame_;
+  Size pool_size_{0, 0};
+  Size last_content_size_{0, 0};
   std::optional<std::chrono::high_resolution_clock::time_point>
       last_frame_timestamp_;
 

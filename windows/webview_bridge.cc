@@ -156,23 +156,6 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
   texture_bridge_->SetOnFrameAvailable(
       [this]() { texture_registrar_->MarkTextureFrameAvailable(texture_id_); });
 
-  texture_bridge_->SetOnFrameSizeChanged([this](size_t width, size_t height) {
-    const auto event = flutter::EncodableValue(flutter::EncodableMap{
-        {flutter::EncodableValue(kEventType),
-         flutter::EncodableValue("frameSizeChanged")},
-        {flutter::EncodableValue(kEventValue),
-         flutter::EncodableValue(flutter::EncodableMap{
-             {flutter::EncodableValue("width"),
-              flutter::EncodableValue(static_cast<int64_t>(width))},
-             {flutter::EncodableValue("height"),
-              flutter::EncodableValue(static_cast<int64_t>(height))},
-         })},
-    });
-    EmitEvent(event);
-  });
-
-  webview_->SetSurfaceSize(71, 71, 1.0f);
-
   const auto method_channel_name =
       std::format("io.jns.webview.win/{}", texture_id_);
   method_channel_ =
@@ -448,6 +431,7 @@ void WebviewBridge::HandleMethodCall(
                                static_cast<float>(scale_factor));
 
       texture_bridge_->Start();
+      texture_registrar_->MarkTextureFrameAvailable(texture_id_);
       return result->Success();
     }
     return result->Error(kErrorInvalidArgs);

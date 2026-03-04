@@ -20,9 +20,9 @@ class TextureBridgeGpu : public TextureBridge {
   Size surface_size_ = {0, 0};
   winrt::com_ptr<ID3D11Texture2D> surface_{nullptr};
   winrt::com_ptr<IDXGIResource> dxgi_surface_;
-  winrt::com_ptr<ID3D11RenderTargetView> surface_rtv_{nullptr};
 
   void ProcessFrame(winrt::com_ptr<ID3D11Texture2D> src_texture,
+                    size_t content_width, size_t content_height,
                     size_t requested_width, size_t requested_height);
   void EnsureSurface(uint32_t width, uint32_t height);
 };

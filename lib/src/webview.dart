@@ -182,11 +182,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Stream<bool> get containsFullScreenElementChanged =>
       _containsFullScreenElementChangedStreamController.stream;
 
-  final StreamController<Size> _frameSizeStreamController =
-      StreamController<Size>.broadcast();
-
-  Stream<Size> get _frameSize => _frameSizeStreamController.stream;
-
   WebviewController() : super(WebviewValue.uninitialized());
 
   /// Initializes the underlying platform view.
@@ -251,13 +246,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             break;
           case 'containsFullScreenElementChanged':
             _containsFullScreenElementChangedStreamController.add(map['value']);
-            break;
-          case 'frameSizeChanged':
-            final value = map['value'];
-            _frameSizeStreamController.add(Size(
-              (value['width'] as int).toDouble(),
-              (value['height'] as int).toDouble(),
-            ));
             break;
         }
       });
@@ -638,7 +626,6 @@ class Webview extends StatefulWidget {
 }
 
 class _WebviewState extends State<Webview> {
-  final GlobalKey _key = GlobalKey();
   final _downButtons = <int, PointerButton>{};
 
   PointerDeviceKind _pointerKind = PointerDeviceKind.unknown;
@@ -668,13 +655,10 @@ class _WebviewState extends State<Webview> {
 
   @override
   Widget build(BuildContext context) {
-    return (widget.height != null && widget.width != null)
-        ? SizedBox(
-            key: _key,
-            width: widget.width,
-            height: widget.height,
-            child: _buildInner())
-        : SizedBox.expand(key: _key, child: _buildInner());
+    return SizedBox(
+        width: widget.width ?? double.infinity,
+        height: widget.height ?? double.infinity,
+        child: _buildInner());
   }
 
   Widget _buildInner() {
@@ -749,7 +733,6 @@ class _WebviewState extends State<Webview> {
           child: RenderWebview(
             textureId: _controller._textureId,
             filterQuality: widget.filterQuality,
-            frameSize: _controller._frameSize,
             onSizeChanged: _updateSurfaceSize,
           ),
         ));

@@ -11,6 +11,7 @@
 
 namespace {
 const int kNumBuffers = 1;
+const float kPoolHeadroomMultiplier = 1.25f;
 }  // namespace
 
 TextureBridge::TextureBridge(GraphicsContext* graphics_context,
@@ -50,12 +51,19 @@ bool TextureBridge::Start() {
   ABI::Windows::Graphics::SizeInt32 size;
   capture_item_->get_Size(&size);
 
+  ABI::Windows::Graphics::SizeInt32 pool_size;
+  pool_size.Width = static_cast<INT32>(size.Width * kPoolHeadroomMultiplier);
+  pool_size.Height = static_cast<INT32>(size.Height * kPoolHeadroomMultiplier);
+
   frame_pool_ = graphics_context_->CreateCaptureFramePool(
       graphics_context_->device(),
       static_cast<ABI::Windows::Graphics::DirectX::DirectXPixelFormat>(
           kPixelFormat),
-      kNumBuffers, size);
+      kNumBuffers, pool_size);
   assert(frame_pool_);
+
+  pool_size_ = {static_cast<size_t>(pool_size.Width),
+                static_cast<size_t>(pool_size.Height)};
 
   frame_pool_->add_FrameArrived(
       Microsoft::WRL::Callback<ABI::Windows::Foundation::ITypedEventHandler<
@@ -122,26 +130,57 @@ void TextureBridge::OnFrameArrived() {
           util::TryGetDXGIInterfaceFromObject<ID3D11Texture2D>(frame_surface);
       has_frame = !ShouldDropFrame();
     }
+
+    ABI::Windows::Graphics::SizeInt32 content_size;
+    if (SUCCEEDED(frame->get_ContentSize(&content_size))) {
+      last_content_size_ = {static_cast<size_t>(content_size.Width),
+                            static_cast<size_t>(content_size.Height)};
+    }
   }
 
   if (needs_update_) {
     ABI::Windows::Graphics::SizeInt32 size;
     capture_item_->get_Size(&size);
-    frame_pool_->Recreate(
-        graphics_context_->device(),
-        static_cast<ABI::Windows::Graphics::DirectX::DirectXPixelFormat>(
-            kPixelFormat),
-        kNumBuffers, size);
-    needs_update_ = false;
-  }
 
-  if (has_frame && last_frame_ && on_frame_size_changed_) {
-    D3D11_TEXTURE2D_DESC desc;
-    last_frame_->GetDesc(&desc);
-    if (desc.Width != last_emitted_frame_size_.width ||
-        desc.Height != last_emitted_frame_size_.height) {
-      last_emitted_frame_size_ = {desc.Width, desc.Height};
-      on_frame_size_changed_(desc.Width, desc.Height);
+    if (static_cast<size_t>(size.Width) > pool_size_.width ||
+        static_cast<size_t>(size.Height) > pool_size_.height) {
+      ABI::Windows::Graphics::SizeInt32 new_size;
+      new_size.Width = static_cast<INT32>(
+          (std::max)(size.Width, static_cast<INT32>(pool_size_.width)) *
+          kPoolHeadroomMultiplier);
+      new_size.Height = static_cast<INT32>(
+          (std::max)(size.Height, static_cast<INT32>(pool_size_.height)) *
+          kPoolHeadroomMultiplier);
+
+      frame_pool_->Recreate(
+          graphics_context_->device(),
+          static_cast<ABI::Windows::Graphics::DirectX::DirectXPixelFormat>(
+              kPixelFormat),
+          kNumBuffers, new_size);
+
+      pool_size_ = {static_cast<size_t>(new_size.Width),
+                    static_cast<size_t>(new_size.Height)};
+    }
+
+    needs_update_ = false;
+  } else if (pool_size_.width > 0 && pool_size_.height > 0) {
+    ABI::Windows::Graphics::SizeInt32 size;
+    capture_item_->get_Size(&size);
+
+    if (pool_size_.width > static_cast<size_t>(size.Width) * 2 ||
+        pool_size_.height > static_cast<size_t>(size.Height) * 2) {
+      ABI::Windows::Graphics::SizeInt32 new_size;
+      new_size.Width = size.Width;
+      new_size.Height = size.Height;
+
+      frame_pool_->Recreate(
+          graphics_context_->device(),
+          static_cast<ABI::Windows::Graphics::DirectX::DirectXPixelFormat>(
+              kPixelFormat),
+          kNumBuffers, new_size);
+
+      pool_size_ = {static_cast<size_t>(new_size.Width),
+                    static_cast<size_t>(new_size.Height)};
     }
   }
 
