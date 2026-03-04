@@ -1,6 +1,5 @@
 #include "texture_bridge_gpu.h"
 
-#include <algorithm>
 #include <iostream>
 
 #include "util/direct3d11.interop.h"
@@ -15,16 +14,15 @@ TextureBridgeGpu::TextureBridgeGpu(
 }
 
 void TextureBridgeGpu::ProcessFrame(winrt::com_ptr<ID3D11Texture2D> src_texture,
-                                    size_t content_width, size_t content_height,
                                     size_t requested_width,
                                     size_t requested_height) {
   D3D11_TEXTURE2D_DESC desc;
   src_texture->GetDesc(&desc);
 
   auto effective_width =
-      (std::min)(content_width, static_cast<size_t>(desc.Width));
+      (std::min)(last_content_size_.width, static_cast<size_t>(desc.Width));
   auto effective_height =
-      (std::min)(content_height, static_cast<size_t>(desc.Height));
+      (std::min)(last_content_size_.height, static_cast<size_t>(desc.Height));
 
   EnsureSurface(static_cast<uint32_t>(requested_width),
                 static_cast<uint32_t>(requested_height));
@@ -102,8 +100,7 @@ TextureBridgeGpu::GetSurfaceDescriptor(size_t width, size_t height) {
   }
 
   if (last_frame_) {
-    ProcessFrame(last_frame_, last_content_size_.width,
-                 last_content_size_.height, width, height);
+    ProcessFrame(last_frame_, width, height);
   }
 
   if (surface_) {

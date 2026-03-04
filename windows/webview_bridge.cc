@@ -178,9 +178,7 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
       [this](const flutter::EncodableValue* arguments,
              std::unique_ptr<flutter::EventSink<flutter::EncodableValue>>&&
                  events) {
-        {
-          event_sink_ = std::move(events);
-        }
+        event_sink_ = std::move(events);
         RegisterEventHandlers();
         return nullptr;
       },

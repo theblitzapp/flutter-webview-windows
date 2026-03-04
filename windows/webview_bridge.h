@@ -6,7 +6,6 @@
 #include <flutter/texture_registrar.h>
 
 #include <memory>
-#include <mutex>
 
 #include "graphics_context.h"
 #include "texture_bridge.h"

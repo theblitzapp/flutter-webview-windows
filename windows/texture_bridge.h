@@ -3,7 +3,6 @@
 #include <windows.graphics.capture.h>
 #include <wrl.h>
 
-#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
