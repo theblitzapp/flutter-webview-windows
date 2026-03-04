@@ -87,11 +87,9 @@ class WebviewBox extends RenderBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    final paintSize = size;
     context.addLayer(
       TextureLayer(
-        rect: Rect.fromLTWH(
-            offset.dx, offset.dy, paintSize.width, paintSize.height),
+        rect: Rect.fromLTWH(offset.dx, offset.dy, size.width, size.height),
         textureId: _textureId,
         filterQuality: _filterQuality,
       ),
