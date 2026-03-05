@@ -4,7 +4,7 @@ description: Demonstrates how to use the webview_windows plugin.
 publish_to: "none"
 
 environment:
-  sdk: ">=2.12.0 <3.0.0"
+  sdk: ">=2.17.0 <3.0.0"
 
 dependencies:
   flutter:
@@ -12,7 +12,6 @@ dependencies:
 
   webview_windows:
     path: ../
-  window_manager: ^0.2.7
 
 dev_dependencies:
   flutter_test:

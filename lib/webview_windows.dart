@@ -1,2 +1,11 @@
-export 'src/enums.dart';
-export 'src/webview.dart';
+export 'src/models/cross_origin_request.dart';
+export 'src/models/download_event.dart';
+export 'src/models/error_status.dart';
+export 'src/models/history_changed.dart';
+export 'src/models/loading_state.dart';
+export 'src/models/permissions.dart';
+export 'src/models/pointer.dart';
+export 'src/models/popup_policy.dart';
+export 'src/models/script_id.dart';
+export 'src/widgets/webview.dart';
+export 'src/controller.dart';
