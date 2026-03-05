@@ -41,6 +41,7 @@ constexpr auto kMethodClearCache = "clearCache";
 constexpr auto kMethodSetCacheDisabled = "setCacheDisabled";
 constexpr auto kMethodSetPopupWindowPolicy = "setPopupWindowPolicy";
 constexpr auto kMethodSetFpsLimit = "setFpsLimit";
+constexpr auto kMethodSetMuted = "setMuted";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -192,6 +193,7 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
 
 WebviewBridge::~WebviewBridge() {
   method_channel_->SetMethodCallHandler(nullptr);
+
   texture_registrar_->UnregisterTexture(texture_id_);
 }
 
@@ -691,12 +693,24 @@ void WebviewBridge::HandleMethodCall(
     return result->Error(kErrorInvalidArgs);
   }
 
+  // setFpsLimit: int
   if (method_name.compare(kMethodSetFpsLimit) == 0) {
     if (const auto value = std::get_if<int32_t>(method_call.arguments())) {
       texture_bridge_->SetFpsLimit(*value == 0 ? std::nullopt
                                                : std::make_optional(*value));
       return result->Success();
     }
+  }
+
+  // setMuted: bool
+  if (method_name.compare(kMethodSetMuted) == 0) {
+    if (const auto muted = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetMuted(*muted)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed, "Setting muted state failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
   }
 
   result->NotImplemented();

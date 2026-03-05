@@ -172,6 +172,7 @@ class Webview {
   bool SetZoomFactor(double factor);
   bool Suspend();
   bool Resume();
+  bool SetMuted(bool muted);
 
   bool SetVirtualHostNameMapping(const std::string& hostName,
                                  const std::string& path,
