@@ -191,7 +191,7 @@ class _WebviewState extends State<Webview> {
 
     final controller = widget.controller;
 
-    if (!controller.isReady) {
+    if (!controller.value.isInitialized) {
       final requestId = _updateSizeRequestId;
 
       controller.ready.then((_) {

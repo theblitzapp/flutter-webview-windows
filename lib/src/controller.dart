@@ -78,7 +78,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   late Completer<void> _creatingCompleter;
   bool _isDisposed = false;
 
-  bool get isReady => _creatingCompleter.isCompleted;
   Future<void> get ready => _creatingCompleter.future;
 
   PermissionRequestedDelegate? _permissionRequested;
