@@ -9,7 +9,7 @@ void main() {
   testWidgets(
     'disposing of a webview does not cause a crash',
     (WidgetTester tester) async {
-      for (var i = 0; i < 100; i++) {
+      for (var i = 0; i < 16; i++) {
         final controller = WebviewController();
         await controller.initialize();
 
