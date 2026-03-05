@@ -614,12 +614,15 @@ class Webview extends StatefulWidget {
   /// unless specifying a [scaleFactor].
   final FilterQuality filterQuality;
 
-  const Webview(this.controller,
-      {this.width,
+  const Webview(
+      {Key? key,
+      required this.controller,
+      this.width,
       this.height,
       this.permissionRequested,
       this.scaleFactor,
-      this.filterQuality = FilterQuality.none});
+      this.filterQuality = FilterQuality.none})
+      : super(key: key);
 
   @override
   _WebviewState createState() => _WebviewState();
