@@ -28,7 +28,6 @@ class ExampleBrowser extends StatefulWidget {
 class _ExampleBrowser extends State<ExampleBrowser> {
   final _controller = WebviewController();
   final _textController = TextEditingController();
-  final List<StreamSubscription> _subscriptions = [];
   bool _isWebviewSuspended = false;
 
   @override
@@ -48,14 +47,9 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     try {
       await _controller.initialize();
 
-      _subscriptions.add(_controller.url.listen((url) {
-        _textController.text = url;
-      }));
-
-      _subscriptions
-          .add(_controller.containsFullScreenElementChanged.listen((flag) {
-        debugPrint('Contains fullscreen element: $flag');
-      }));
+      _controller.url.addListener(_onUrlChanged);
+      _controller.containsFullScreenElement
+          .addListener(_onContainsFullScreenElementChanged);
 
       await _controller.setBackgroundColor(Colors.transparent);
       await _controller.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
@@ -88,6 +82,15 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                 ));
       });
     }
+  }
+
+  void _onUrlChanged() {
+    _textController.text = _controller.url.value ?? '';
+  }
+
+  void _onContainsFullScreenElementChanged() {
+    debugPrint(
+        'Contains fullscreen element: ${_controller.containsFullScreenElement.value}');
   }
 
   Widget compositeView() {
@@ -138,28 +141,47 @@ class _ExampleBrowser extends State<ExampleBrowser> {
               ]),
             ),
             Expanded(
-                child: Card(
-                    color: Colors.transparent,
-                    elevation: 0,
-                    clipBehavior: Clip.antiAliasWithSaveLayer,
-                    child: Stack(
-                      children: [
-                        Webview(
-                          controller: _controller,
-                          permissionRequested: _onPermissionRequested,
-                        ),
-                        StreamBuilder<LoadingState>(
-                            stream: _controller.loadingState,
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData &&
-                                  snapshot.data == LoadingState.loading) {
-                                return LinearProgressIndicator();
-                              } else {
-                                return SizedBox();
-                              }
-                            }),
-                      ],
-                    ))),
+              child: Card(
+                color: Colors.transparent,
+                elevation: 0,
+                clipBehavior: Clip.antiAliasWithSaveLayer,
+                child: Stack(
+                  children: [
+                    Webview(
+                      controller: _controller,
+                      permissionRequested: _onPermissionRequested,
+                    ),
+                    Positioned(
+                      bottom: 16,
+                      left: 16,
+                      child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(8),
+                            child: WebviewSubregion(
+                              controller: _controller,
+                              subregion: Rect.fromLTWH(20, 80, 100, 100),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          )),
+                    ),
+                    ValueListenableBuilder<LoadingState>(
+                      valueListenable: _controller.loadingState,
+                      builder: (context, loadingState, _child) {
+                        if (loadingState == LoadingState.loading) {
+                          return LinearProgressIndicator();
+                        } else {
+                          return SizedBox();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -184,11 +206,10 @@ class _ExampleBrowser extends State<ExampleBrowser> {
         child: Icon(_isWebviewSuspended ? Icons.play_arrow : Icons.pause),
       ),
       appBar: AppBar(
-          title: StreamBuilder<String>(
-        stream: _controller.title,
-        builder: (context, snapshot) {
-          return Text(
-              snapshot.hasData ? snapshot.data! : 'WebView (Windows) Example');
+          title: ValueListenableBuilder<String?>(
+        valueListenable: _controller.title,
+        builder: (context, title, _child) {
+          return Text(title ?? 'WebView (Windows) Example');
         },
       )),
       body: Center(
@@ -224,8 +245,12 @@ class _ExampleBrowser extends State<ExampleBrowser> {
 
   @override
   void dispose() {
-    _subscriptions.forEach((s) => s.cancel());
+    _controller.url.removeListener(_onUrlChanged);
+    _controller.containsFullScreenElement
+        .removeListener(_onContainsFullScreenElementChanged);
+
     _controller.dispose();
+
     super.dispose();
   }
 }
