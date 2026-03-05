@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 class RenderWebview extends LeafRenderObjectWidget {
@@ -6,11 +9,13 @@ class RenderWebview extends LeafRenderObjectWidget {
     Key? key,
     required this.textureId,
     required this.filterQuality,
+    required this.cursor,
     required this.onSizeChanged,
   }) : super(key: key);
 
   final int textureId;
   final FilterQuality filterQuality;
+  final Stream<SystemMouseCursor> cursor;
   final void Function(Size) onSizeChanged;
 
   @override
@@ -18,6 +23,7 @@ class RenderWebview extends LeafRenderObjectWidget {
     return WebviewBox(
         textureId: textureId,
         filterQuality: filterQuality,
+        cursorStream: cursor,
         onSizeChanged: onSizeChanged);
   }
 
@@ -25,20 +31,28 @@ class RenderWebview extends LeafRenderObjectWidget {
   void updateRenderObject(BuildContext context, WebviewBox renderObject) {
     renderObject.textureId = textureId;
     renderObject.filterQuality = filterQuality;
+    renderObject.cursorStream = cursor;
     renderObject.onSizeChanged = onSizeChanged;
   }
 }
 
-class WebviewBox extends RenderBox {
+class WebviewBox extends RenderBox implements MouseTrackerAnnotation {
   WebviewBox({
     required int textureId,
     FilterQuality filterQuality = FilterQuality.low,
+    required Stream<SystemMouseCursor> cursorStream,
     required this.onSizeChanged,
   })  : _textureId = textureId,
-        _filterQuality = filterQuality;
+        _filterQuality = filterQuality,
+        _cursorStream = cursorStream;
+
+  Stream<SystemMouseCursor> _cursorStream;
+  StreamSubscription<SystemMouseCursor>? _cursorSubscription;
+
+  SystemMouseCursor _cursor = SystemMouseCursors.basic;
+  bool _validForMouseTracker = false;
 
   void Function(Size) onSizeChanged;
-
   Size? _lastNotifiedSize;
 
   int get textureId => _textureId;
@@ -59,6 +73,22 @@ class WebviewBox extends RenderBox {
     }
   }
 
+  Stream<SystemMouseCursor> get cursorStream => _cursorStream;
+  set cursorStream(Stream<SystemMouseCursor> value) {
+    if (value != _cursorStream) {
+      _cursorStream = value;
+
+      _cursorSubscription?.cancel();
+
+      if (_cursorSubscription != null) {
+        _cursorSubscription = value.listen(_onCursorChanged);
+      }
+    }
+  }
+
+  @override
+  SystemMouseCursor get cursor => _cursor;
+
   @override
   bool get sizedByParent => true;
 
@@ -67,6 +97,14 @@ class WebviewBox extends RenderBox {
 
   @override
   bool get isRepaintBoundary => true;
+
+  void _onCursorChanged(SystemMouseCursor cursor) {
+    _cursor = cursor;
+
+    // A repaint is needed in order to trigger a device update of
+    // [MouseTracker] so that this new value can be found.
+    markNeedsPaint();
+  }
 
   @override
   @protected
@@ -94,5 +132,33 @@ class WebviewBox extends RenderBox {
         filterQuality: _filterQuality,
       ),
     );
+  }
+
+  @override
+  PointerEnterEventListener? get onEnter => null;
+
+  @override
+  PointerExitEventListener? get onExit => null;
+
+  @override
+  bool get validForMouseTracker => _validForMouseTracker;
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+
+    _validForMouseTracker = true;
+
+    _cursorSubscription = cursorStream.listen(_onCursorChanged);
+  }
+
+  @override
+  void detach() {
+    _cursorSubscription?.cancel();
+    _cursorSubscription = null;
+
+    _validForMouseTracker = false;
+
+    super.detach();
   }
 }
