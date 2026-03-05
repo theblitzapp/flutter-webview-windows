@@ -192,6 +192,10 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
 }
 
 WebviewBridge::~WebviewBridge() {
+  if (texture_bridge_) {
+    texture_bridge_->Stop();
+  }
+
   method_channel_->SetMethodCallHandler(nullptr);
 
   texture_registrar_->UnregisterTexture(texture_id_);

@@ -90,6 +90,13 @@ Webview::Webview(
 }
 
 Webview::~Webview() {
+  UnregisterEventHandlers();
+
+  if (webview_controller_) {
+    webview_controller_->Close();
+    webview_controller_ = nullptr;
+  }
+
   if (owns_window_) {
     DestroyWindow(hwnd_);
   }
@@ -416,6 +423,51 @@ void Webview::RegisterEventHandlers() {
             })
             .Get(),
         &event_registrations_.download_starting_token_);
+  }
+}
+
+void Webview::UnregisterEventHandlers() {
+  if (webview_) {
+    webview_->remove_ContentLoading(
+        event_registrations_.content_loading_token_);
+    webview_->remove_NavigationCompleted(
+        event_registrations_.navigation_completed_token_);
+    webview_->remove_HistoryChanged(
+        event_registrations_.history_changed_token_);
+    webview_->remove_SourceChanged(event_registrations_.source_changed_token_);
+    webview_->remove_DocumentTitleChanged(
+        event_registrations_.document_title_changed_token_);
+    webview_->remove_WebMessageReceived(
+        event_registrations_.web_message_received_token_);
+    webview_->remove_PermissionRequested(
+        event_registrations_.permission_requested_token_);
+    webview_->remove_NewWindowRequested(
+        event_registrations_.new_windows_requested_token_);
+    webview_->remove_ContainsFullScreenElementChanged(
+        event_registrations_.contains_fullscreen_element_changed_token_);
+
+    // Download events (ICoreWebView2_4)
+    auto webview24 = webview_.try_query<ICoreWebView2_4>();
+    if (webview24) {
+      webview24->remove_DownloadStarting(
+          event_registrations_.download_starting_token_);
+    }
+  }
+
+  if (composition_controller_) {
+    composition_controller_->remove_CursorChanged(
+        event_registrations_.cursor_changed_token_);
+  }
+
+  if (webview_controller_) {
+    webview_controller_->remove_GotFocus(event_registrations_.got_focus_token_);
+    webview_controller_->remove_LostFocus(
+        event_registrations_.lost_focus_token_);
+  }
+
+  if (devtools_protocol_event_receiver_) {
+    devtools_protocol_event_receiver_->remove_DevToolsProtocolEventReceived(
+        event_registrations_.devtools_protocol_event_token_);
   }
 }
 

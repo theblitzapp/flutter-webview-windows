@@ -147,7 +147,7 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                     child: Stack(
                       children: [
                         Webview(
-                          _controller,
+                          controller: _controller,
                           permissionRequested: _onPermissionRequested,
                         ),
                         StreamBuilder<LoadingState>(

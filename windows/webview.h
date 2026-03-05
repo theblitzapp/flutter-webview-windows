@@ -280,6 +280,8 @@ class Webview {
       winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor,
       HWND hwnd, bool offscreen_only);
   void RegisterEventHandlers();
+  void UnregisterEventHandlers();
+
   void EnableSecurityUpdates();
   void SendScroll(double offset, bool horizontal);
 };
