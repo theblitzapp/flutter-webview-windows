@@ -802,6 +802,24 @@ bool Webview::Resume() {
          webview_controller_->put_IsVisible(true) == S_OK;
 }
 
+bool Webview::SetMuted(bool muted) {
+  if (!IsValid()) {
+    return false;
+  }
+
+  wil::com_ptr<ICoreWebView2_8> webview8;
+  if (FAILED(webview_.try_query_to(&webview8)) || !webview8) {
+    return false;
+  }
+
+  HRESULT hr = webview8->put_IsMuted(muted ? TRUE : FALSE);
+  if (SUCCEEDED(hr)) {
+    return true;
+  }
+
+  return false;
+}
+
 bool Webview::SetVirtualHostNameMapping(
     const std::string& hostName, const std::string& path,
     WebviewHostResourceAccessKind accessKind) {
