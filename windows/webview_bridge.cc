@@ -289,6 +289,20 @@ void WebviewBridge::RegisterEventHandlers() {
 
   webview_->OnSurfaceSizeChanged([this](size_t width, size_t height) {
     texture_bridge_->NotifySurfaceSizeChanged();
+
+    const auto event = flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue(kEventType),
+         flutter::EncodableValue("sizeChanged")},
+        {flutter::EncodableValue(kEventValue),
+         flutter::EncodableValue(flutter::EncodableMap{
+             {flutter::EncodableValue("width"),
+              flutter::EncodableValue(static_cast<double>(width))},
+             {flutter::EncodableValue("height"),
+              flutter::EncodableValue(static_cast<double>(height))},
+         })},
+    });
+
+    EmitEvent(event);
   });
 
   webview_->OnCursorChanged([this](const HCURSOR cursor) {

@@ -53,10 +53,11 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   /// WebviewController is created/initialized.
   ///
   /// Throws [PlatformException] if the environment was initialized before.
-  static Future<void> initializeEnvironment(
-      {String? userDataPath,
-      String? browserExePath,
-      String? additionalArguments}) async {
+  static Future<void> initializeEnvironment({
+    String? userDataPath,
+    String? browserExePath,
+    String? additionalArguments,
+  }) async {
     return _pluginChannel
         .invokeMethod('initializeEnvironment', <String, Object?>{
       'userDataPath': userDataPath,
@@ -91,75 +92,78 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   /// The texture ID that was assigned to the webview surface by Flutter.
   int get textureId => _textureId;
 
-  final StreamController<String> _urlStreamController =
-      StreamController<String>();
+  final ValueNotifier<String?> _urlNotifier = ValueNotifier<String?>(null);
 
   /// A stream reflecting the current URL.
-  Stream<String> get url => _urlStreamController.stream;
+  ValueListenable<String?> get url => _urlNotifier;
 
-  final StreamController<LoadingState> _loadingStateStreamController =
-      StreamController<LoadingState>.broadcast();
+  final ValueNotifier<LoadingState> _loadingStateNotifier =
+      ValueNotifier<LoadingState>(LoadingState.none);
+
+  /// Reflects the current loading state.
+  ValueListenable<LoadingState> get loadingState => _loadingStateNotifier;
 
   final StreamController<WebviewDownloadEvent> _downloadEventStreamController =
       StreamController<WebviewDownloadEvent>.broadcast();
 
-  final StreamController<WebErrorStatus> _onLoadErrorStreamController =
-      StreamController<WebErrorStatus>();
-
-  /// A stream reflecting the current loading state.
-  Stream<LoadingState> get loadingState => _loadingStateStreamController.stream;
-
   Stream<WebviewDownloadEvent> get onDownloadEvent =>
       _downloadEventStreamController.stream;
 
-  /// A stream reflecting the navigation error when navigation completed with an error.
+  final StreamController<WebErrorStatus> _onLoadErrorStreamController =
+      StreamController<WebErrorStatus>.broadcast();
+
+  /// Reflects the navigation error when navigation completed with an error.
   Stream<WebErrorStatus> get onLoadError => _onLoadErrorStreamController.stream;
 
-  final StreamController<HistoryChanged> _historyChangedStreamController =
-      StreamController<HistoryChanged>();
+  final ValueNotifier<HistoryChanged> _historyStateNotifier =
+      ValueNotifier<HistoryChanged>(
+          HistoryChanged(canGoBack: false, canGoForward: false));
 
-  /// A stream reflecting the current history state.
-  Stream<HistoryChanged> get historyChanged =>
-      _historyChangedStreamController.stream;
+  /// Reflects the current history state.
+  ValueListenable<HistoryChanged> get historyState => _historyStateNotifier;
 
-  final StreamController<String> _securityStateChangedStreamController =
-      StreamController<String>();
+  final ValueNotifier<String?> _securityStateNotifier =
+      ValueNotifier<String?>(null);
 
-  /// A stream reflecting the current security state.
-  Stream<String> get securityStateChanged =>
-      _securityStateChangedStreamController.stream;
+  /// Reflects the current security state.
+  ValueListenable<String?> get securityState => _securityStateNotifier;
 
-  final StreamController<String> _titleStreamController =
-      StreamController<String>();
+  final ValueNotifier<String?> _titleNotifier = ValueNotifier<String?>(null);
 
-  /// A stream reflecting the current document title.
-  Stream<String> get title => _titleStreamController.stream;
+  /// Reflects the current document title.
+  ValueListenable<String?> get title => _titleNotifier;
 
-  final StreamController<SystemMouseCursor> _cursorStreamController =
-      StreamController<SystemMouseCursor>.broadcast();
+  final ValueNotifier<SystemMouseCursor> _cursorNotifier =
+      ValueNotifier<SystemMouseCursor>(SystemMouseCursors.basic);
 
-  /// A stream reflecting the current cursor style.
-  Stream<SystemMouseCursor> get cursor => _cursorStreamController.stream;
+  /// Reflects the current cursor style.
+  ValueListenable<SystemMouseCursor> get cursor => _cursorNotifier;
 
-  final StreamController<dynamic> _webMessageStreamController =
-      StreamController<dynamic>();
+  final StreamController<Object?> _webMessageStreamController =
+      StreamController<Object?>.broadcast();
 
-  Stream<dynamic> get webMessage => _webMessageStreamController.stream;
+  Stream<Object?> get webMessage => _webMessageStreamController.stream;
 
-  final StreamController<bool>
-      _containsFullScreenElementChangedStreamController =
-      StreamController<bool>.broadcast();
+  final ValueNotifier<bool> _containsFullScreenElementNotifier =
+      ValueNotifier<bool>(false);
 
-  /// A stream reflecting whether the document currently contains full-screen elements.
-  Stream<bool> get containsFullScreenElementChanged =>
-      _containsFullScreenElementChangedStreamController.stream;
+  /// Reflects whether the document currently contains full-screen elements.
+  ValueListenable<bool> get containsFullScreenElement =>
+      _containsFullScreenElementNotifier;
+
+  final ValueNotifier<Size> _sizeNotifier = ValueNotifier<Size>(Size.zero);
+
+  /// Reflects the current size of the webview surface.
+  ValueListenable<Size> get size => _sizeNotifier;
 
   /// Initializes the underlying platform view.
   Future<void> initialize() async {
     if (_isDisposed) {
       return Future<void>.value();
     }
+
     _creatingCompleter = Completer<void>();
+
     try {
       final reply =
           await _pluginChannel.invokeMapMethod<String, Object?>('initialize');
@@ -181,7 +185,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
 
         switch (map['type']) {
           case 'urlChanged':
-            _urlStreamController.add(map['value']);
+            _urlNotifier.value = map['value'];
             break;
 
           case 'onLoadError':
@@ -192,9 +196,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             break;
 
           case 'loadingStateChanged':
-            _loadingStateStreamController.add(
-              LoadingState.values[map['value']],
-            );
+            _loadingStateNotifier.value = LoadingState.values[map['value']];
 
             break;
 
@@ -212,31 +214,26 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             break;
 
           case 'historyChanged':
-            _historyChangedStreamController.add(
-              HistoryChanged(
-                canGoBack: map['value']['canGoBack'],
-                canGoForward: map['value']['canGoForward'],
-              ),
+            _historyStateNotifier.value = HistoryChanged(
+              canGoBack: map['value']['canGoBack'],
+              canGoForward: map['value']['canGoForward'],
             );
 
             break;
 
           case 'securityStateChanged':
-            _securityStateChangedStreamController.add(
-              map['value'],
-            );
+            _securityStateNotifier.value = map['value'];
+
             break;
 
           case 'titleChanged':
-            _titleStreamController.add(
-              map['value'],
-            );
+            _titleNotifier.value = map['value'];
+
             break;
 
           case 'cursorChanged':
-            _cursorStreamController.add(
-              getCursorByName(map['value']),
-            );
+            _cursorNotifier.value = getCursorByName(map['value']);
+
             break;
 
           case 'webMessageReceived':
@@ -251,8 +248,14 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             break;
 
           case 'containsFullScreenElementChanged':
-            _containsFullScreenElementChangedStreamController.add(
-              map['value'],
+            _containsFullScreenElementNotifier.value = map['value'];
+
+            break;
+
+          case 'sizeChanged':
+            _sizeNotifier.value = Size(
+              (map['value']['width'] as num).toDouble(),
+              (map['value']['height'] as num).toDouble(),
             );
 
             break;

@@ -1,3 +1,4 @@
+export 'src/controller.dart';
 export 'src/models/cross_origin_request.dart';
 export 'src/models/download_event.dart';
 export 'src/models/error_status.dart';
@@ -8,4 +9,4 @@ export 'src/models/pointer.dart';
 export 'src/models/popup_policy.dart';
 export 'src/models/script_id.dart';
 export 'src/widgets/webview.dart';
-export 'src/controller.dart';
+export 'src/widgets/webview_subregion.dart';
