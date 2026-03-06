@@ -37,18 +37,37 @@ if(NOT NUGET)
   endif()
 endif()
 
-# Create custom target for dependencies
-add_custom_target(${PROJECT_NAME}_DEPENDENCIES_DOWNLOAD ALL)
+# Download dependencies using NuGet only if not already present
+set(WIL_PKG_DIR "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary")
+set(WEBVIEW_PKG_DIR "${CMAKE_BINARY_DIR}/packages/Microsoft.Web.WebView2")
 
-# Download dependencies using NuGet
-# Note: Removed DEPENDS keyword from TARGET version of add_custom_command
-add_custom_command(
-  TARGET ${PROJECT_NAME}_DEPENDENCIES_DOWNLOAD PRE_BUILD
-  COMMAND ${CMAKE_COMMAND} -E echo "Downloading dependencies..."
-  COMMAND ${NUGET} install Microsoft.Windows.ImplementationLibrary -Version ${WIL_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
-  COMMAND ${NUGET} install Microsoft.Web.WebView2 -Version ${WEBVIEW_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
-  COMMENT "Downloading and installing NuGet packages"
-)
+if(NOT EXISTS "${WIL_PKG_DIR}" OR NOT EXISTS "${WEBVIEW_PKG_DIR}")
+  message(NOTICE "Fetching NuGet packages...")
+
+  if(NOT EXISTS "${WIL_PKG_DIR}")
+    execute_process(
+      COMMAND ${NUGET} install Microsoft.Windows.ImplementationLibrary -Version ${WIL_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
+      RESULT_VARIABLE WIL_RESULT
+    )
+
+    if(NOT WIL_RESULT EQUAL 0)
+      message(FATAL_ERROR "Failed to install Microsoft.Windows.ImplementationLibrary")
+    endif()
+  endif()
+
+  if(NOT EXISTS "${WEBVIEW_PKG_DIR}")
+    execute_process(
+      COMMAND ${NUGET} install Microsoft.Web.WebView2 -Version ${WEBVIEW_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
+      RESULT_VARIABLE WEBVIEW_RESULT
+    )
+
+    if(NOT WEBVIEW_RESULT EQUAL 0)
+      message(FATAL_ERROR "Failed to install Microsoft.Web.WebView2")
+    endif()
+  endif()
+else()
+  message(NOTICE "NuGet packages already present, skipping download.")
+endif()
 
 # Define source files
 set(PLUGIN_SOURCES
@@ -80,15 +99,15 @@ apply_standard_settings(${PLUGIN_NAME})
 target_compile_features(${PLUGIN_NAME} PUBLIC cxx_std_20)
 
 # Configure visibility
-set_target_properties(${PLUGIN_NAME} PROPERTIES 
+set_target_properties(${PLUGIN_NAME} PROPERTIES
   CXX_VISIBILITY_PRESET hidden
 )
 
 # Add dependencies
-target_link_libraries(${PLUGIN_NAME} PRIVATE 
+target_link_libraries(${PLUGIN_NAME} PRIVATE
   ${CMAKE_BINARY_DIR}/packages/Microsoft.Web.WebView2/build/native/Microsoft.Web.WebView2.targets
   ${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary/build/native/Microsoft.Windows.ImplementationLibrary.targets
-  flutter 
+  flutter
   flutter_wrapper_plugin
 )
 
@@ -101,4 +120,4 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
 # Set bundled libraries
 set(webview_windows_bundled_libraries
   PARENT_SCOPE
-) 
+)
