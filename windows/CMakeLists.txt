@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 
 # Set CMP0175 to NEW to properly handle add_custom_command arguments
 if(POLICY CMP0175)
@@ -94,6 +94,9 @@ endif()
 
 # Apply standard settings
 apply_standard_settings(${PLUGIN_NAME})
+
+# Precompiled header to avoid re-parsing heavy SDK headers in every translation unit
+target_precompile_headers(${PLUGIN_NAME} PRIVATE pch.h)
 
 # Set C++ standard to 20 for std::format support
 target_compile_features(${PLUGIN_NAME} PUBLIC cxx_std_20)
