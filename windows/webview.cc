@@ -212,8 +212,7 @@ void Webview::RegisterEventHandlers() {
                 [this, uri](bool cancel) {
                   if (!cancel) {
                     navigation_starting_allowed_url_ = uri;
-                    webview_->Navigate(
-                        util::Utf16FromUtf8(uri).c_str());
+                    webview_->Navigate(util::Utf16FromUtf8(uri).c_str());
                   }
                 });
 
@@ -393,14 +392,37 @@ void Webview::RegisterEventHandlers() {
       Callback<ICoreWebView2NewWindowRequestedEventHandler>(
           [this](ICoreWebView2* sender,
                  ICoreWebView2NewWindowRequestedEventArgs* args) -> HRESULT {
-            switch (popup_window_policy_) {
-              case WebviewPopupWindowPolicy::Deny:
-                args->put_Handled(TRUE);
-                break;
-              case WebviewPopupWindowPolicy::ShowInSameWindow:
-                args->put_NewWindow(webview_.get());
-                args->put_Handled(TRUE);
-                break;
+            if (!new_window_requested_callback_) {
+              return S_OK;
+            }
+
+            wil::unique_cotaskmem_string wuri;
+            BOOL is_user_initiated = FALSE;
+
+            if (args->get_Uri(&wuri) == S_OK) {
+              args->get_IsUserInitiated(&is_user_initiated);
+
+              wil::com_ptr<ICoreWebView2Deferral> deferral;
+              args->GetDeferral(deferral.put());
+
+              const std::string uri = util::Utf8FromUtf16(wuri.get());
+              new_window_requested_callback_(
+                  uri, is_user_initiated == TRUE,
+                  [this, deferral, args](NewWindowDecision decision) {
+                    switch (decision) {
+                      case NewWindowDecision::Deny:
+                        args->put_Handled(TRUE);
+                        break;
+                      case NewWindowDecision::ShowInSameWindow:
+                        args->put_NewWindow(webview_.get());
+                        args->put_Handled(TRUE);
+                        break;
+                      case NewWindowDecision::Allow:
+                      default:
+                        break;
+                    }
+                    deferral->Complete();
+                  });
             }
 
             return S_OK;
@@ -593,10 +615,6 @@ bool Webview::SetCacheDisabled(bool disabled) {
   return webview_->CallDevToolsProtocolMethod(L"Network.setCacheDisabled",
                                               util::Utf16FromUtf8(json).c_str(),
                                               nullptr) == S_OK;
-}
-
-void Webview::SetPopupWindowPolicy(WebviewPopupWindowPolicy policy) {
-  popup_window_policy_ = policy;
 }
 
 bool Webview::SetUserAgent(const std::string& user_agent) {

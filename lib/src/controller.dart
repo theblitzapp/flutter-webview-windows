@@ -86,6 +86,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
 
   PermissionRequestedDelegate? _permissionRequested;
   NavigationStartingDelegate? _navigationStarting;
+  NewWindowRequestedDelegate? _newWindowRequested;
 
   late MethodChannel _methodChannel;
   late EventChannel _eventChannel;
@@ -282,6 +283,11 @@ class WebviewController extends ValueNotifier<WebviewValue> {
           return _onNavigationStarting(call.arguments as Map<dynamic, dynamic>);
         }
 
+        if (call.method == 'newWindowRequested') {
+          return _onNewWindowRequested(
+              call.arguments as Map<dynamic, dynamic>);
+        }
+
         throw MissingPluginException('Unknown method ${call.method}');
       });
 
@@ -312,6 +318,16 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     _navigationStarting = navigationStarting;
   }
 
+  /// Sets the new window requested delegate.
+  ///
+  /// The delegate is called when a new window (popup) is requested, letting
+  /// you decide whether to allow, deny, or show it in the same window.
+  void setNewWindowRequestedDelegate(
+    NewWindowRequestedDelegate? newWindowRequested,
+  ) {
+    _newWindowRequested = newWindowRequested;
+  }
+
   Future<bool?> _onNavigationStarting(Map<dynamic, dynamic> args) async {
     final navigationStarting = _navigationStarting;
 
@@ -331,6 +347,24 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     }
 
     return false;
+  }
+
+  Future<int?> _onNewWindowRequested(Map<dynamic, dynamic> args) async {
+    final newWindowRequested = _newWindowRequested;
+
+    if (newWindowRequested == null) {
+      return null;
+    }
+
+    final url = args['url'] as String?;
+    final isUserInitiated = args['isUserInitiated'] as bool?;
+
+    if (url != null && isUserInitiated != null) {
+      final decision = await newWindowRequested(url, isUserInitiated);
+      return decision.index;
+    }
+
+    return null;
   }
 
   Future<bool?> _onPermissionRequested(Map<dynamic, dynamic> args) async {
@@ -615,20 +649,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('setZoomFactor', zoomFactor);
-  }
-
-  /// Sets the [WebviewPopupWindowPolicy].
-  Future<void> setPopupWindowPolicy(
-    WebviewPopupWindowPolicy popupPolicy,
-  ) async {
-    if (_isDisposed) {
-      return;
-    }
-
-    assert(value.isInitialized);
-
-    return _methodChannel.invokeMethod(
-        'setPopupWindowPolicy', popupPolicy.index);
   }
 
   /// Suspends the web view.

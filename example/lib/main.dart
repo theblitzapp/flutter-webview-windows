@@ -59,7 +59,12 @@ class _ExampleBrowser extends State<ExampleBrowser> {
           .addListener(_onContainsFullScreenElementChanged);
 
       await _controller.setBackgroundColor(Colors.transparent);
-      await _controller.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
+
+      _controller.setNewWindowRequestedDelegate((url, isUserInitiated) async {
+        print('New window requested: $url, isUserInitiated: $isUserInitiated');
+        return NewWindowDecision.deny;
+      });
+
       await _controller.loadUrl('https://flutter.dev');
 
       if (!mounted) return;

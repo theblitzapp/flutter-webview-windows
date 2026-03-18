@@ -56,4 +56,7 @@ class WebviewBridge {
   void OnNavigationStarting(const std::string& url, bool is_user_initiated,
                              bool is_redirected,
                              Webview::NavigationStartingCompleter completer);
+
+  void OnNewWindowRequested(const std::string& url, bool is_user_initiated,
+                            Webview::NewWindowRequestedCompleter completer);
 };

@@ -35,7 +35,7 @@ enum class WebviewPermissionKind {
 
 enum class WebviewPermissionState { Default, Allow, Deny };
 
-enum class WebviewPopupWindowPolicy { Allow, Deny, ShowInSameWindow };
+enum class NewWindowDecision { Allow, Deny, ShowInSameWindow };
 
 enum class WebviewHostResourceAccessKind { Deny, Allow, DenyCors };
 
@@ -141,6 +141,11 @@ class Webview {
                              bool is_redirected,
                              NavigationStartingCompleter completer)>
       NavigationStartingCallback;
+  typedef std::function<void(NewWindowDecision decision)>
+      NewWindowRequestedCompleter;
+  typedef std::function<void(const std::string& url, bool is_user_initiated,
+                             NewWindowRequestedCompleter completer)>
+      NewWindowRequestedCallback;
 
   ~Webview();
 
@@ -172,7 +177,6 @@ class Webview {
   bool ClearCookies();
   bool ClearCache();
   bool SetCacheDisabled(bool disabled);
-  void SetPopupWindowPolicy(WebviewPopupWindowPolicy policy);
   bool SetUserAgent(const std::string& user_agent);
   bool OpenDevTools();
   bool SetDevToolsEnabled(bool enabled);
@@ -247,6 +251,10 @@ class Webview {
     navigation_starting_callback_ = std::move(callback);
   }
 
+  void OnNewWindowRequested(NewWindowRequestedCallback callback) {
+    new_window_requested_callback_ = std::move(callback);
+  }
+
  private:
   HWND hwnd_;
   bool owns_window_;
@@ -261,8 +269,6 @@ class Webview {
   wil::com_ptr<ICoreWebView2Settings2> settings2_;
   POINT last_cursor_pos_ = {0, 0};
   VirtualKeyState virtual_keys_;
-  WebviewPopupWindowPolicy popup_window_policy_ =
-      WebviewPopupWindowPolicy::Allow;
 
   winrt::com_ptr<ABI::Windows::UI::Composition::IVisual> surface_;
   winrt::com_ptr<ABI::Windows::UI::Composition::Desktop::IDesktopWindowTarget>
@@ -286,6 +292,7 @@ class Webview {
   ContainsFullScreenElementChangedCallback
       contains_fullscreen_element_changed_callback_;
   NavigationStartingCallback navigation_starting_callback_;
+  NewWindowRequestedCallback new_window_requested_callback_;
   std::optional<std::string> navigation_starting_allowed_url_;
 
   Webview(
