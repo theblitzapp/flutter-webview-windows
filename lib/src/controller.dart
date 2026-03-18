@@ -9,6 +9,7 @@ import 'package:webview_windows/src/models/download_event.dart';
 import 'package:webview_windows/src/models/error_status.dart';
 import 'package:webview_windows/src/models/history_changed.dart';
 import 'package:webview_windows/src/models/loading_state.dart';
+import 'package:webview_windows/src/models/navigation.dart';
 import 'package:webview_windows/src/models/permissions.dart';
 import 'package:webview_windows/src/models/popup_policy.dart';
 import 'package:webview_windows/src/models/script_id.dart';
@@ -82,6 +83,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Future<void> get ready => _creatingCompleter.future;
 
   PermissionRequestedDelegate? _permissionRequested;
+  NavigationStartingDelegate? _navigationStarting;
 
   late MethodChannel _methodChannel;
   late EventChannel _eventChannel;
@@ -268,6 +270,10 @@ class WebviewController extends ValueNotifier<WebviewValue> {
               call.arguments as Map<dynamic, dynamic>);
         }
 
+        if (call.method == 'navigationStarting') {
+          return _onNavigationStarting(call.arguments as Map<dynamic, dynamic>);
+        }
+
         throw MissingPluginException('Unknown method ${call.method}');
       });
 
@@ -286,6 +292,37 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     PermissionRequestedDelegate? permissionRequested,
   ) {
     _permissionRequested = permissionRequested;
+  }
+
+  /// Sets the navigation starting delegate.
+  ///
+  /// The delegate is called when a navigation is initiated, letting you decide whether to allow or cancel the
+  /// navigation request.
+  void setNavigationStartingDelegate(
+    NavigationStartingDelegate? navigationStarting,
+  ) {
+    _navigationStarting = navigationStarting;
+  }
+
+  Future<bool?> _onNavigationStarting(Map<dynamic, dynamic> args) async {
+    final navigationStarting = _navigationStarting;
+
+    if (navigationStarting == null) {
+      return false;
+    }
+
+    final url = args['url'] as String?;
+    final isUserInitiated = args['isUserInitiated'] as bool?;
+    final isRedirected = args['isRedirected'] as bool?;
+
+    if (url != null && isUserInitiated != null && isRedirected != null) {
+      final decision =
+          await navigationStarting(url, isUserInitiated, isRedirected);
+
+      return decision == NavigationDecision.cancel;
+    }
+
+    return false;
   }
 
   Future<bool?> _onPermissionRequested(Map<dynamic, dynamic> args) async {
@@ -517,7 +554,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   }
 
   /// Controls whether the user can open DevTools.
-  /// 
+  ///
   /// When disabled, the [openDevTools] method and the F12 shortcut will not work.
   Future<void> setDevToolsEnabled(bool enabled) async {
     if (_isDisposed) {

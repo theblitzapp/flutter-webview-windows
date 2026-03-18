@@ -47,6 +47,13 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     try {
       await _controller.initialize();
 
+      _controller.setNavigationStartingDelegate(
+          (url, isUserInitiated, isRedirected) async {
+        print('Navigation starting: $url, $isUserInitiated, $isRedirected');
+
+        return NavigationDecision.navigate;
+      });
+
       _controller.url.addListener(_onUrlChanged);
       _controller.containsFullScreenElement
           .addListener(_onContainsFullScreenElementChanged);

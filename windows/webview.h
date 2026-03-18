@@ -7,6 +7,7 @@
 #include <winrt/base.h>
 
 #include <functional>
+#include <optional>
 
 class WebviewHost;
 
@@ -104,6 +105,7 @@ struct EventRegistrations {
   EventRegistrationToken download_starting_token_{};
   EventRegistrationToken download_bytes_received_token_{};
   EventRegistrationToken download_state_changed_token_{};
+  EventRegistrationToken navigation_starting_token_{};
 };
 
 class Webview {
@@ -134,6 +136,11 @@ class Webview {
   typedef std::function<void(bool contains_fullscreen_element)>
       ContainsFullScreenElementChangedCallback;
   typedef std::function<void(WebviewDownloadEvent)> DownloadEventCallback;
+  typedef std::function<void(bool cancel)> NavigationStartingCompleter;
+  typedef std::function<void(const std::string& url, bool is_user_initiated,
+                             bool is_redirected,
+                             NavigationStartingCompleter completer)>
+      NavigationStartingCallback;
 
   ~Webview();
 
@@ -236,6 +243,10 @@ class Webview {
     contains_fullscreen_element_changed_callback_ = std::move(callback);
   }
 
+  void OnNavigationStarting(NavigationStartingCallback callback) {
+    navigation_starting_callback_ = std::move(callback);
+  }
+
  private:
   HWND hwnd_;
   bool owns_window_;
@@ -274,6 +285,8 @@ class Webview {
   DevtoolsProtocolEventCallback devtools_protocol_event_callback_;
   ContainsFullScreenElementChangedCallback
       contains_fullscreen_element_changed_callback_;
+  NavigationStartingCallback navigation_starting_callback_;
+  std::optional<std::string> navigation_starting_allowed_url_;
 
   Webview(
       wil::com_ptr<ICoreWebView2CompositionController> composition_controller,

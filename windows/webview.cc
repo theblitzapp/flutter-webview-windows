@@ -179,6 +179,49 @@ void Webview::RegisterEventHandlers() {
     return;
   }
 
+  webview_->add_NavigationStarting(
+      Callback<ICoreWebView2NavigationStartingEventHandler>(
+          [this](ICoreWebView2* sender,
+                 ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
+            if (!navigation_starting_callback_) {
+              return S_OK;
+            }
+
+            wil::unique_cotaskmem_string wuri;
+            if (args->get_Uri(&wuri) != S_OK) {
+              return S_OK;
+            }
+
+            std::string uri = util::Utf8FromUtf16(wuri.get());
+
+            if (navigation_starting_allowed_url_.has_value() &&
+                navigation_starting_allowed_url_.value() == uri) {
+              navigation_starting_allowed_url_.reset();
+              return S_OK;
+            }
+
+            BOOL is_user_initiated = FALSE;
+            BOOL is_redirected = FALSE;
+            args->get_IsUserInitiated(&is_user_initiated);
+            args->get_IsRedirected(&is_redirected);
+
+            args->put_Cancel(TRUE);
+
+            navigation_starting_callback_(
+                uri, is_user_initiated == TRUE, is_redirected == TRUE,
+                [this, uri](bool cancel) {
+                  if (!cancel) {
+                    navigation_starting_allowed_url_ = uri;
+                    webview_->Navigate(
+                        util::Utf16FromUtf8(uri).c_str());
+                  }
+                });
+
+            return S_OK;
+          })
+          .Get(),
+      &event_registrations_.navigation_starting_token_);
+
   webview_->add_ContentLoading(
       Callback<ICoreWebView2ContentLoadingEventHandler>(
           [this](ICoreWebView2* sender, IUnknown* args) -> HRESULT {

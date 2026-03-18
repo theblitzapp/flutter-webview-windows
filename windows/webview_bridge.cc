@@ -331,6 +331,13 @@ void WebviewBridge::RegisterEventHandlers() {
         OnPermissionRequested(url, kind, is_user_initiated, completer);
       });
 
+  webview_->OnNavigationStarting(
+      [this](const std::string& url, bool is_user_initiated,
+             bool is_redirected,
+             Webview::NavigationStartingCompleter completer) {
+        OnNavigationStarting(url, is_user_initiated, is_redirected, completer);
+      });
+
   webview_->OnContainsFullScreenElementChanged(
       [this](bool contains_fullscreen_element) {
         const auto event = flutter::EncodableValue(flutter::EncodableMap{
@@ -368,6 +375,33 @@ void WebviewBridge::OnPermissionRequested(
             completer(WebviewPermissionState::Default);
           },
           [completer]() { completer(WebviewPermissionState::Default); }));
+}
+
+void WebviewBridge::OnNavigationStarting(
+    const std::string& url, bool isUserInitiated, bool isRedirected,
+    Webview::NavigationStartingCompleter completer) {
+  auto args = std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+      {"url", url},
+      {"isUserInitiated", isUserInitiated},
+      {"isRedirected", isRedirected}});
+
+  method_channel_->InvokeMethod(
+      "navigationStarting", std::move(args),
+      std::make_unique<flutter::MethodResultFunctions<flutter::EncodableValue>>(
+          [completer](const flutter::EncodableValue* result) {
+            auto allow = std::get_if<bool>(result);
+            if (allow != nullptr) {
+              completer(*allow);
+              return;
+            }
+            completer(false);
+          },
+          [completer](const std::string& error_code,
+                      const std::string& error_message,
+                      const flutter::EncodableValue* error_details) {
+            completer(false);
+          },
+          [completer]() { completer(false); }));
 }
 
 void WebviewBridge::HandleMethodCall(
