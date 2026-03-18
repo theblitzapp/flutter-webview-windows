@@ -512,6 +512,20 @@ bool Webview::SetDevToolsEnabled(bool enabled) {
   return SUCCEEDED(settings_->put_AreDevToolsEnabled(enabled ? TRUE : FALSE));
 }
 
+bool Webview::SetTrackingPreventionLevel(int level) {
+  auto webview13 = webview_.try_query<ICoreWebView2_13>();
+  if (!webview13) return false;
+
+  wil::com_ptr<ICoreWebView2Profile> profile;
+  if (FAILED(webview13->get_Profile(&profile))) return false;
+
+  auto profile3 = profile.try_query<ICoreWebView2Profile3>();
+  if (!profile3) return false;
+
+  return SUCCEEDED(profile3->put_PreferredTrackingPreventionLevel(
+      static_cast<COREWEBVIEW2_TRACKING_PREVENTION_LEVEL>(level)));
+}
+
 bool Webview::ClearCookies() {
   if (!IsValid()) {
     return false;

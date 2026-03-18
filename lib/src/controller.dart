@@ -12,6 +12,7 @@ import 'package:webview_windows/src/models/loading_state.dart';
 import 'package:webview_windows/src/models/permissions.dart';
 import 'package:webview_windows/src/models/popup_policy.dart';
 import 'package:webview_windows/src/models/script_id.dart';
+import 'package:webview_windows/src/models/tracking_prevention.dart';
 
 import 'cursor.dart';
 
@@ -526,6 +527,22 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('setDevToolsEnabled', enabled);
+  }
+
+  /// Sets the tracking prevention level.
+  ///
+  /// See [WebviewTrackingPreventionLevel] for available levels.
+  Future<void> setTrackingPreventionLevel(
+    WebviewTrackingPreventionLevel level,
+  ) async {
+    if (_isDisposed) {
+      return;
+    }
+
+    assert(value.isInitialized);
+
+    return _methodChannel.invokeMethod(
+        'setTrackingPreventionLevel', level.index);
   }
 
   /// Sets the background color to the provided [color].

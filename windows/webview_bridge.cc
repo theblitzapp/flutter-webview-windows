@@ -43,6 +43,7 @@ constexpr auto kMethodSetPopupWindowPolicy = "setPopupWindowPolicy";
 constexpr auto kMethodSetFpsLimit = "setFpsLimit";
 constexpr auto kMethodSetMuted = "setMuted";
 constexpr auto kMethodSetDevToolsEnabled = "setDevToolsEnabled";
+constexpr auto kMethodSetTrackingPreventionLevel = "setTrackingPreventionLevel";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -741,6 +742,20 @@ void WebviewBridge::HandleMethodCall(
 
       return result->Error(kMethodFailed,
                            "Setting devtools enabled state failed.");
+    }
+
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setTrackingPreventionLevel: int
+  if (method_name.compare(kMethodSetTrackingPreventionLevel) == 0) {
+    if (const auto level = std::get_if<int32_t>(method_call.arguments())) {
+      if (webview_->SetTrackingPreventionLevel(*level)) {
+        return result->Success();
+      }
+
+      return result->Error(kMethodFailed,
+                           "Setting tracking prevention level failed.");
     }
 
     return result->Error(kErrorInvalidArgs);
