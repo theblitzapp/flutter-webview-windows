@@ -75,6 +75,8 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     return _pluginChannel.invokeMethod<String>('getWebViewVersion');
   }
 
+  static bool _staleInstancesCleared = false;
+
   WebviewController() : super(WebviewValue.uninitialized());
 
   late Completer<void> _creatingCompleter;
@@ -162,6 +164,12 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   Future<void> initialize() async {
     if (_isDisposed) {
       return Future<void>.value();
+    }
+
+    if (kDebugMode && !_staleInstancesCleared) {
+      _staleInstancesCleared = true;
+
+      await _pluginChannel.invokeMethod('disposeAll');
     }
 
     _creatingCompleter = Completer<void>();

@@ -21,6 +21,7 @@ namespace {
 
 constexpr auto kMethodInitialize = "initialize";
 constexpr auto kMethodDispose = "dispose";
+constexpr auto kMethodDisposeAll = "disposeAll";
 constexpr auto kMethodInitializeEnvironment = "initializeEnvironment";
 constexpr auto kMethodGetWebViewVersion = "getWebViewVersion";
 
@@ -163,6 +164,12 @@ void WebviewWindowsPlugin::HandleMethodCall(
 
   if (method_call.method_name().compare(kMethodInitialize) == 0) {
     return CreateWebviewInstance(std::move(result));
+  }
+
+  if (method_call.method_name().compare(kMethodDisposeAll) == 0) {
+    instances_.clear();
+
+    return result->Success();
   }
 
   if (method_call.method_name().compare(kMethodDispose) == 0) {
