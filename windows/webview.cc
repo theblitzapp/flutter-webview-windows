@@ -75,12 +75,11 @@ Webview::Webview(
   webview_controller_->put_ShouldDetectMonitorScaleChanges(FALSE);
   webview_controller_->put_RasterizationScale(1.0);
 
-  wil::com_ptr<ICoreWebView2Settings> settings;
-  if (SUCCEEDED(webview_->get_Settings(settings.put()))) {
-    settings2_ = settings.try_query<ICoreWebView2Settings2>();
+  if (SUCCEEDED(webview_->get_Settings(settings_.put()))) {
+    settings2_ = settings_.try_query<ICoreWebView2Settings2>();
 
-    settings->put_IsStatusBarEnabled(FALSE);
-    settings->put_AreDefaultContextMenusEnabled(FALSE);
+    settings_->put_IsStatusBarEnabled(FALSE);
+    settings_->put_AreDefaultContextMenusEnabled(FALSE);
   }
 
   EnableSecurityUpdates();
@@ -506,6 +505,11 @@ bool Webview::OpenDevTools() {
   }
   webview_->OpenDevToolsWindow();
   return true;
+}
+
+bool Webview::SetDevToolsEnabled(bool enabled) {
+  if (!settings_) return false;
+  return SUCCEEDED(settings_->put_AreDevToolsEnabled(enabled ? TRUE : FALSE));
 }
 
 bool Webview::ClearCookies() {

@@ -515,6 +515,19 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     return _methodChannel.invokeMethod('openDevTools');
   }
 
+  /// Controls whether the user can open DevTools.
+  /// 
+  /// When disabled, the [openDevTools] method and the F12 shortcut will not work.
+  Future<void> setDevToolsEnabled(bool enabled) async {
+    if (_isDisposed) {
+      return;
+    }
+
+    assert(value.isInitialized);
+
+    return _methodChannel.invokeMethod('setDevToolsEnabled', enabled);
+  }
+
   /// Sets the background color to the provided [color].
   ///
   /// Due to a limitation of the underlying WebView implementation,

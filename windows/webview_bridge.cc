@@ -42,6 +42,7 @@ constexpr auto kMethodSetCacheDisabled = "setCacheDisabled";
 constexpr auto kMethodSetPopupWindowPolicy = "setPopupWindowPolicy";
 constexpr auto kMethodSetFpsLimit = "setFpsLimit";
 constexpr auto kMethodSetMuted = "setMuted";
+constexpr auto kMethodSetDevToolsEnabled = "setDevToolsEnabled";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -728,6 +729,20 @@ void WebviewBridge::HandleMethodCall(
       }
       return result->Error(kMethodFailed, "Setting muted state failed.");
     }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setDevToolsEnabled: bool
+  if (method_name.compare(kMethodSetDevToolsEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetDevToolsEnabled(*enabled)) {
+        return result->Success();
+      }
+
+      return result->Error(kMethodFailed,
+                           "Setting devtools enabled state failed.");
+    }
+
     return result->Error(kErrorInvalidArgs);
   }
 
