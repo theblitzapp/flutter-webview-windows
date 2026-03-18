@@ -37,36 +37,67 @@ if(NOT NUGET)
   endif()
 endif()
 
-# Download dependencies using NuGet only if not already present
+# Download dependencies using NuGet, re-downloading if the defined version changes.
 set(WIL_PKG_DIR "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary")
 set(WEBVIEW_PKG_DIR "${CMAKE_BINARY_DIR}/packages/Microsoft.Web.WebView2")
+set(WIL_STAMP "${WIL_PKG_DIR}/.version")
+set(WEBVIEW_STAMP "${WEBVIEW_PKG_DIR}/.version")
 
-if(NOT EXISTS "${WIL_PKG_DIR}" OR NOT EXISTS "${WEBVIEW_PKG_DIR}")
-  message(NOTICE "Fetching NuGet packages...")
+set(WIL_NEEDS_INSTALL FALSE)
+set(WEBVIEW_NEEDS_INSTALL FALSE)
 
-  if(NOT EXISTS "${WIL_PKG_DIR}")
-    execute_process(
-      COMMAND ${NUGET} install Microsoft.Windows.ImplementationLibrary -Version ${WIL_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
-      RESULT_VARIABLE WIL_RESULT
-    )
-
-    if(NOT WIL_RESULT EQUAL 0)
-      message(FATAL_ERROR "Failed to install Microsoft.Windows.ImplementationLibrary")
-    endif()
-  endif()
-
-  if(NOT EXISTS "${WEBVIEW_PKG_DIR}")
-    execute_process(
-      COMMAND ${NUGET} install Microsoft.Web.WebView2 -Version ${WEBVIEW_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
-      RESULT_VARIABLE WEBVIEW_RESULT
-    )
-
-    if(NOT WEBVIEW_RESULT EQUAL 0)
-      message(FATAL_ERROR "Failed to install Microsoft.Web.WebView2")
-    endif()
+if(EXISTS "${WIL_STAMP}")
+  file(READ "${WIL_STAMP}" WIL_INSTALLED_VERSION)
+  if(NOT WIL_INSTALLED_VERSION STREQUAL "${WIL_VERSION}")
+    message(NOTICE "WIL version changed (${WIL_INSTALLED_VERSION} -> ${WIL_VERSION}), re-downloading.")
+    file(REMOVE_RECURSE "${WIL_PKG_DIR}")
+    set(WIL_NEEDS_INSTALL TRUE)
   endif()
 else()
-  message(NOTICE "NuGet packages already present, skipping download.")
+  if(EXISTS "${WIL_PKG_DIR}")
+    message(NOTICE "WIL version stamp missing, re-downloading to ensure correct version.")
+    file(REMOVE_RECURSE "${WIL_PKG_DIR}")
+  endif()
+  set(WIL_NEEDS_INSTALL TRUE)
+endif()
+
+if(EXISTS "${WEBVIEW_STAMP}")
+  file(READ "${WEBVIEW_STAMP}" WEBVIEW_INSTALLED_VERSION)
+  if(NOT WEBVIEW_INSTALLED_VERSION STREQUAL "${WEBVIEW_VERSION}")
+    message(NOTICE "WebView2 version changed (${WEBVIEW_INSTALLED_VERSION} -> ${WEBVIEW_VERSION}), re-downloading.")
+    file(REMOVE_RECURSE "${WEBVIEW_PKG_DIR}")
+    set(WEBVIEW_NEEDS_INSTALL TRUE)
+  endif()
+else()
+  if(EXISTS "${WEBVIEW_PKG_DIR}")
+    message(NOTICE "WebView2 version stamp missing, re-downloading to ensure correct version.")
+    file(REMOVE_RECURSE "${WEBVIEW_PKG_DIR}")
+  endif()
+  set(WEBVIEW_NEEDS_INSTALL TRUE)
+endif()
+
+if(WIL_NEEDS_INSTALL)
+  message(NOTICE "Fetching Microsoft.Windows.ImplementationLibrary ${WIL_VERSION}...")
+  execute_process(
+    COMMAND ${NUGET} install Microsoft.Windows.ImplementationLibrary -Version ${WIL_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
+    RESULT_VARIABLE WIL_RESULT
+  )
+  if(NOT WIL_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to install Microsoft.Windows.ImplementationLibrary")
+  endif()
+  file(WRITE "${WIL_STAMP}" "${WIL_VERSION}")
+endif()
+
+if(WEBVIEW_NEEDS_INSTALL)
+  message(NOTICE "Fetching Microsoft.Web.WebView2 ${WEBVIEW_VERSION}...")
+  execute_process(
+    COMMAND ${NUGET} install Microsoft.Web.WebView2 -Version ${WEBVIEW_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
+    RESULT_VARIABLE WEBVIEW_RESULT
+  )
+  if(NOT WEBVIEW_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to install Microsoft.Web.WebView2")
+  endif()
+  file(WRITE "${WEBVIEW_STAMP}" "${WEBVIEW_VERSION}")
 endif()
 
 # Define source files
