@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <optional>
+#include <set>
 
 class WebviewHost;
 
@@ -294,6 +295,8 @@ class Webview {
   NavigationStartingCallback navigation_starting_callback_;
   NewWindowRequestedCallback new_window_requested_callback_;
   std::optional<std::string> navigation_starting_allowed_url_;
+  std::set<UINT64> intercepted_navigation_ids_;
+  int navigation_intercept_id_ = 0;
 
   Webview(
       wil::com_ptr<ICoreWebView2CompositionController> composition_controller,

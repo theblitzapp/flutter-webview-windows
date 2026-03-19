@@ -205,12 +205,17 @@ void Webview::RegisterEventHandlers() {
             args->get_IsUserInitiated(&is_user_initiated);
             args->get_IsRedirected(&is_redirected);
 
+            UINT64 nav_id = 0;
+            args->get_NavigationId(&nav_id);
+            intercepted_navigation_ids_.insert(nav_id);
+
+            auto intercept_id = ++navigation_intercept_id_;
             args->put_Cancel(TRUE);
 
             navigation_starting_callback_(
                 uri, is_user_initiated == TRUE, is_redirected == TRUE,
-                [this, uri](bool cancel) {
-                  if (!cancel) {
+                [this, uri, intercept_id](bool cancel) {
+                  if (!cancel && intercept_id == navigation_intercept_id_) {
                     navigation_starting_allowed_url_ = uri;
                     webview_->Navigate(util::Utf16FromUtf8(uri).c_str());
                   }
@@ -237,6 +242,16 @@ void Webview::RegisterEventHandlers() {
       Callback<ICoreWebView2NavigationCompletedEventHandler>(
           [this](ICoreWebView2* sender,
                  ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT {
+            UINT64 nav_id = 0;
+            wil::com_ptr<ICoreWebView2NavigationCompletedEventArgs2> args2;
+            if (SUCCEEDED(args->QueryInterface(IID_PPV_ARGS(&args2)))) {
+              args2->get_NavigationId(&nav_id);
+            }
+
+            if (intercepted_navigation_ids_.erase(nav_id)) {
+              return S_OK;
+            }
+
             BOOL is_success;
             args->get_IsSuccess(&is_success);
             if (!is_success && on_load_error_callback_) {

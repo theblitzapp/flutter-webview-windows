@@ -51,7 +51,14 @@ class _ExampleBrowser extends State<ExampleBrowser> {
           (url, isUserInitiated, isRedirected) async {
         print('Navigation starting: $url, $isUserInitiated, $isRedirected');
 
+        await Future.delayed(Duration(seconds: 3));
+
         return NavigationDecision.navigate;
+      });
+
+      _controller.onLoadError.listen(print);
+      _controller.loadingState.addListener(() {
+        print('Loading state: ${_controller.loadingState.value}');
       });
 
       _controller.url.addListener(_onUrlChanged);
