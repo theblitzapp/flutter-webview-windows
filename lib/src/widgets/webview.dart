@@ -163,6 +163,7 @@ class _WebviewState extends State<Webview> {
       child = null;
     } else {
       child = Listener(
+        behavior: HitTestBehavior.translucent,
         onPointerHover: _onPointerHover,
         onPointerDown: _onPointerDown,
         onPointerUp: onPointerUp,
@@ -173,7 +174,8 @@ class _WebviewState extends State<Webview> {
         child: RenderWebview(
           textureId: widget.controller.textureId,
           filterQuality: widget.filterQuality,
-          cursor: widget.controller.cursor,
+          cursorListenable: widget.controller.cursor,
+          opaqueListenable: widget.controller.isPointerOverOpaqueContent,
           onSizeChanged: _updateSurfaceSize,
         ),
       );

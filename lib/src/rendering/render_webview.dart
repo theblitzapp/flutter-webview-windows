@@ -8,7 +8,8 @@ class RenderWebview extends LeafRenderObjectWidget {
     Key? key,
     required this.textureId,
     required this.filterQuality,
-    required this.cursor,
+    required this.cursorListenable,
+    required this.opaqueListenable,
     required this.onSizeChanged,
   }) : super(key: key);
 
@@ -20,7 +21,11 @@ class RenderWebview extends LeafRenderObjectWidget {
 
   /// The current cursor style for the webview. This is typically taken directly
   /// from the [WebviewController].
-  final ValueListenable<SystemMouseCursor> cursor;
+  final ValueListenable<SystemMouseCursor> cursorListenable;
+
+  /// When non-null, enables transparency-aware hit testing. The listenable
+  /// reflects whether the pointer is currently over an opaque pixel.
+  final ValueListenable<bool> opaqueListenable;
 
   /// A callback that is called when the size of the webview surface changes.
   /// This is typically used to update the size of the webview surface in the
@@ -32,7 +37,8 @@ class RenderWebview extends LeafRenderObjectWidget {
     return WebviewBox(
       textureId: textureId,
       filterQuality: filterQuality,
-      cursorListenable: cursor,
+      cursorListenable: cursorListenable,
+      opaqueListenable: opaqueListenable,
       onSizeChanged: onSizeChanged,
     );
   }
@@ -42,7 +48,8 @@ class RenderWebview extends LeafRenderObjectWidget {
     renderObject
       ..textureId = textureId
       ..filterQuality = filterQuality
-      ..cursorListenable = cursor
+      ..cursorListenable = cursorListenable
+      ..opaqueListenable = opaqueListenable
       ..onSizeChanged = onSizeChanged;
   }
 }
@@ -52,10 +59,12 @@ class WebviewBox extends RenderBox implements MouseTrackerAnnotation {
     required int textureId,
     FilterQuality filterQuality = FilterQuality.low,
     required ValueListenable<SystemMouseCursor> cursorListenable,
+    required ValueListenable<bool> opaqueListenable,
     required this.onSizeChanged,
   })  : _textureId = textureId,
         _filterQuality = filterQuality,
-        _cursorListenable = cursorListenable;
+        _cursorListenable = cursorListenable,
+        _opaqueListenable = opaqueListenable;
 
   bool _validForMouseTracker = false;
 
@@ -94,6 +103,27 @@ class WebviewBox extends RenderBox implements MouseTrackerAnnotation {
     }
   }
 
+  ValueListenable<bool> _opaqueListenable;
+
+  ValueListenable<bool> get opaqueListenable => _opaqueListenable;
+  set opaqueListenable(ValueListenable<bool> value) {
+    if (value != _opaqueListenable) {
+      if (attached) {
+        _opaqueListenable.removeListener(_onOpaqueChanged);
+      }
+
+      _opaqueListenable = value;
+
+      if (attached) {
+        _opaqueListenable.addListener(_onOpaqueChanged);
+      }
+    }
+  }
+
+  void _onOpaqueChanged() {
+    markNeedsPaint();
+  }
+
   void Function(Size)? onSizeChanged;
   Size? _lastNotifiedSize;
 
@@ -130,7 +160,7 @@ class WebviewBox extends RenderBox implements MouseTrackerAnnotation {
   }
 
   @override
-  bool hitTestSelf(Offset position) => true;
+  bool hitTestSelf(Offset position) => _opaqueListenable.value;
 
   final LayerHandle<ClipRectLayer> _clipRectLayer =
       LayerHandle<ClipRectLayer>();
@@ -162,11 +192,13 @@ class WebviewBox extends RenderBox implements MouseTrackerAnnotation {
     _validForMouseTracker = true;
 
     cursorListenable.addListener(_onCursorChanged);
+    _opaqueListenable.addListener(_onOpaqueChanged);
   }
 
   @override
   void detach() {
     cursorListenable.removeListener(_onCursorChanged);
+    _opaqueListenable.removeListener(_onOpaqueChanged);
 
     _validForMouseTracker = false;
 

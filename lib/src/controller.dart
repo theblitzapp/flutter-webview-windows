@@ -161,6 +161,14 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   /// Reflects the current size of the webview surface.
   ValueListenable<Size> get size => _sizeNotifier;
 
+  final ValueNotifier<bool> _isPointerOverOpaqueContent =
+      ValueNotifier<bool>(true);
+
+  /// Reflects whether the pointer is currently over an opaque pixel of the
+  /// webview content. Only meaningful when transparency hit testing is enabled.
+  ValueListenable<bool> get isPointerOverOpaqueContent =>
+      _isPointerOverOpaqueContent;
+
   /// Initializes the underlying platform view.
   Future<void> initialize() async {
     if (_isDisposed) {
@@ -270,6 +278,11 @@ class WebviewController extends ValueNotifier<WebviewValue> {
             );
 
             break;
+
+          case 'pointerTransparencyChanged':
+            _isPointerOverOpaqueContent.value = map['value'] as bool;
+
+            break;
         }
       });
 
@@ -284,8 +297,7 @@ class WebviewController extends ValueNotifier<WebviewValue> {
         }
 
         if (call.method == 'newWindowRequested') {
-          return _onNewWindowRequested(
-              call.arguments as Map<dynamic, dynamic>);
+          return _onNewWindowRequested(call.arguments as Map<dynamic, dynamic>);
         }
 
         throw MissingPluginException('Unknown method ${call.method}');
@@ -702,6 +714,26 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     }
 
     return _methodChannel.invokeMethod('clearVirtualHostNameMapping', hostName);
+  }
+
+  /// Enables or disables transparency-aware hit testing. When enabled, the
+  /// native side checks the alpha value at the cursor position on every hover
+  /// and emits a [isPointerOverOpaqueContent] change when the opacity state
+  /// flips. This allows pointer events to pass through transparent areas of
+  /// the webview to widgets behind it.
+  Future<void> setTransparencyHitTestingEnabled(bool enabled) async {
+    if (_isDisposed) {
+      return;
+    }
+
+    assert(value.isInitialized);
+
+    await _methodChannel.invokeMethod(
+        'setTransparencyHitTestingEnabled', enabled);
+
+    if (!enabled) {
+      _isPointerOverOpaqueContent.value = true;
+    }
   }
 
   /// Limits the number of frames per second to the given value.

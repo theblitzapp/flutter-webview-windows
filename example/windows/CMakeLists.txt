@@ -96,3 +96,8 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Copy test_assets to the build output directory.
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../test_assets/"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/test_assets"
+  COMPONENT Runtime)

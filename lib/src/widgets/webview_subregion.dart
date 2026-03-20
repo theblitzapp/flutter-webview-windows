@@ -149,6 +149,7 @@ class _WebviewSubregionState extends State<WebviewSubregion> {
       child = null;
     } else {
       child = Listener(
+        behavior: HitTestBehavior.translucent,
         onPointerHover: _onPointerHover,
         onPointerDown: _onPointerDown,
         onPointerUp: onPointerUp,
@@ -159,7 +160,8 @@ class _WebviewSubregionState extends State<WebviewSubregion> {
         child: RenderWebviewSubregion(
           textureId: widget.controller.textureId,
           filterQuality: widget.filterQuality,
-          cursor: widget.controller.cursor,
+          cursorListenable: widget.controller.cursor,
+          opaqueListenable: widget.controller.isPointerOverOpaqueContent,
           textureSize: widget.controller.size,
           subregion: widget.subregion,
           borderRadius: widget.borderRadius,

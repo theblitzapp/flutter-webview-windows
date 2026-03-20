@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
+import 'package:path/path.dart' as p;
 
 import 'package:webview_windows/webview_windows.dart';
 
@@ -47,15 +50,6 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     try {
       await _controller.initialize();
 
-      _controller.setNavigationStartingDelegate(
-          (url, isUserInitiated, isRedirected) async {
-        print('Navigation starting: $url, $isUserInitiated, $isRedirected');
-
-        await Future.delayed(Duration(seconds: 3));
-
-        return NavigationDecision.navigate;
-      });
-
       _controller.onLoadError.listen(print);
       _controller.loadingState.addListener(() {
         print('Loading state: ${_controller.loadingState.value}');
@@ -69,8 +63,30 @@ class _ExampleBrowser extends State<ExampleBrowser> {
 
       _controller.setNewWindowRequestedDelegate((url, isUserInitiated) async {
         print('New window requested: $url, isUserInitiated: $isUserInitiated');
+
         return NewWindowDecision.deny;
       });
+
+      _controller.setNavigationStartingDelegate(
+          (url, isUserInitiated, isRedirected) async {
+        print('Navigation starting: $url, $isUserInitiated, $isRedirected');
+
+        if (url.contains('test.local')) {
+          await _controller.setTransparencyHitTestingEnabled(true);
+        } else {
+          await _controller.setTransparencyHitTestingEnabled(false);
+        }
+
+        return NavigationDecision.navigate;
+      });
+
+      final testAssetsPath = p.join(
+          Directory(Platform.resolvedExecutable).parent.path, 'test_assets');
+      await _controller.addVirtualHostNameMapping(
+        'test.local',
+        testAssetsPath,
+        WebviewHostResourceAccessKind.allow,
+      );
 
       await _controller.loadUrl('https://flutter.dev');
 
@@ -166,6 +182,7 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                 clipBehavior: Clip.antiAliasWithSaveLayer,
                 child: Stack(
                   children: [
+                    _buildFlutterContentBehindWebview(),
                     Webview(
                       controller: _controller,
                       permissionRequested: _onPermissionRequested,
@@ -205,6 +222,33 @@ class _ExampleBrowser extends State<ExampleBrowser> {
         ),
       );
     }
+  }
+
+  int _flutterClickCount = 0;
+
+  Widget _buildFlutterContentBehindWebview() {
+    return Positioned.fill(
+      child: Center(child: StatefulBuilder(
+        builder: (context, setLocalState) {
+          return ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black87,
+              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            ),
+            label: Text(
+              _flutterClickCount == 0
+                  ? 'Click through transparent area to reach me!'
+                  : 'Flutter click #$_flutterClickCount',
+              style: TextStyle(fontSize: 16),
+            ),
+            onPressed: () {
+              setLocalState(() => _flutterClickCount++);
+            },
+          );
+        },
+      )),
+    );
   }
 
   @override

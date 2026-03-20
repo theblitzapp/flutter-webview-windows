@@ -156,6 +156,8 @@ class Webview {
 
   bool IsValid() { return is_valid_; }
 
+  float scale_factor() const { return scale_factor_; }
+
   void SetSurfaceSize(size_t width, size_t height, float scale_factor);
   void SetCursorPos(double x, double y);
   void SetPointerUpdate(int32_t pointer, WebviewPointerEventKind eventKind,

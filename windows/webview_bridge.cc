@@ -43,6 +43,8 @@ constexpr auto kMethodSetFpsLimit = "setFpsLimit";
 constexpr auto kMethodSetMuted = "setMuted";
 constexpr auto kMethodSetDevToolsEnabled = "setDevToolsEnabled";
 constexpr auto kMethodSetTrackingPreventionLevel = "setTrackingPreventionLevel";
+constexpr auto kMethodSetTransparencyHitTestingEnabled =
+    "setTransparencyHitTestingEnabled";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -331,8 +333,7 @@ void WebviewBridge::RegisterEventHandlers() {
       });
 
   webview_->OnNavigationStarting(
-      [this](const std::string& url, bool is_user_initiated,
-             bool is_redirected,
+      [this](const std::string& url, bool is_user_initiated, bool is_redirected,
              Webview::NavigationStartingCompleter completer) {
         OnNavigationStarting(url, is_user_initiated, is_redirected, completer);
       });
@@ -385,10 +386,10 @@ void WebviewBridge::OnPermissionRequested(
 void WebviewBridge::OnNavigationStarting(
     const std::string& url, bool isUserInitiated, bool isRedirected,
     Webview::NavigationStartingCompleter completer) {
-  auto args = std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
-      {"url", url},
-      {"isUserInitiated", isUserInitiated},
-      {"isRedirected", isRedirected}});
+  auto args = std::make_unique<flutter::EncodableValue>(
+      flutter::EncodableMap{{"url", url},
+                            {"isUserInitiated", isUserInitiated},
+                            {"isRedirected", isRedirected}});
 
   method_channel_->InvokeMethod(
       "navigationStarting", std::move(args),
@@ -413,8 +414,7 @@ void WebviewBridge::OnNewWindowRequested(
     const std::string& url, bool isUserInitiated,
     Webview::NewWindowRequestedCompleter completer) {
   auto args = std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
-      {"url", url},
-      {"isUserInitiated", isUserInitiated}});
+      {"url", url}, {"isUserInitiated", isUserInitiated}});
 
   method_channel_->InvokeMethod(
       "newWindowRequested", std::move(args),
@@ -435,6 +435,29 @@ void WebviewBridge::OnNewWindowRequested(
           [completer]() { completer(NewWindowDecision::Allow); }));
 }
 
+void WebviewBridge::CheckTransparencyAtCursor(double x, double y) {
+  auto scale_factor = webview_->scale_factor();
+  int px = static_cast<int>(x * scale_factor);
+  int py = static_cast<int>(y * scale_factor);
+
+  auto alpha =
+      static_cast<TextureBridgeGpu*>(texture_bridge_.get())->ReadAlpha(px, py);
+  bool is_opaque = alpha > hit_test_alpha_threshold_;
+
+  if (!last_hit_test_opaque_.has_value() ||
+      is_opaque != last_hit_test_opaque_.value()) {
+    last_hit_test_opaque_ = is_opaque;
+
+    const auto event = flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue(kEventType),
+         flutter::EncodableValue("pointerTransparencyChanged")},
+        {flutter::EncodableValue(kEventValue),
+         flutter::EncodableValue(is_opaque)},
+    });
+    EmitEvent(event);
+  }
+}
+
 void WebviewBridge::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
@@ -445,6 +468,11 @@ void WebviewBridge::HandleMethodCall(
     const auto point = GetPointFromArgs(method_call.arguments());
     if (point) {
       webview_->SetCursorPos(point->first, point->second);
+
+      if (transparency_hit_testing_enabled_) {
+        CheckTransparencyAtCursor(point->first, point->second);
+      }
+
       return result->Success();
     }
     return result->Error(kErrorInvalidArgs);
@@ -803,6 +831,20 @@ void WebviewBridge::HandleMethodCall(
                            "Setting tracking prevention level failed.");
     }
 
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setTransparencyHitTestingEnabled: bool
+  if (method_name.compare(kMethodSetTransparencyHitTestingEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      transparency_hit_testing_enabled_ = *enabled;
+
+      if (!enabled) {
+        last_hit_test_opaque_ = std::nullopt;
+      }
+
+      return result->Success();
+    }
     return result->Error(kErrorInvalidArgs);
   }
 

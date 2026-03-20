@@ -8,7 +8,8 @@ class RenderWebviewSubregion extends LeafRenderObjectWidget {
     Key? key,
     required this.textureId,
     required this.filterQuality,
-    required this.cursor,
+    required this.cursorListenable,
+    required this.opaqueListenable,
     required this.textureSize,
     required this.subregion,
     this.borderRadius,
@@ -22,7 +23,11 @@ class RenderWebviewSubregion extends LeafRenderObjectWidget {
 
   /// A stream reflecting the current cursor style for the webview. This is
   /// typically taken directly from the [WebviewController].
-  final ValueListenable<SystemMouseCursor> cursor;
+  final ValueListenable<SystemMouseCursor> cursorListenable;
+
+  /// When non-null, enables transparency-aware hit testing. The listenable
+  /// reflects whether the pointer is currently over an opaque pixel.
+  final ValueListenable<bool> opaqueListenable;
 
   /// A stream reflecting the current size of the webview surface.
   final ValueListenable<Size> textureSize;
@@ -38,7 +43,8 @@ class RenderWebviewSubregion extends LeafRenderObjectWidget {
     return WebviewSubregionBox(
       textureId: textureId,
       filterQuality: filterQuality,
-      cursorListenable: cursor,
+      cursorListenable: cursorListenable,
+      opaqueListenable: opaqueListenable,
       textureSize: textureSize,
       rect: subregion,
       borderRadius: borderRadius,
@@ -52,7 +58,8 @@ class RenderWebviewSubregion extends LeafRenderObjectWidget {
     renderObject
       ..textureId = textureId
       ..filterQuality = filterQuality
-      ..cursorListenable = cursor
+      ..cursorListenable = cursorListenable
+      ..opaqueListenable = opaqueListenable
       ..textureSizeListenable = textureSize
       ..rect = subregion
       ..borderRadius = borderRadius
@@ -79,6 +86,7 @@ class WebviewSubregionBox extends RenderBox implements MouseTrackerAnnotation {
     required int textureId,
     FilterQuality filterQuality = FilterQuality.low,
     required ValueListenable<SystemMouseCursor> cursorListenable,
+    required ValueListenable<bool> opaqueListenable,
     required ValueListenable<Size> textureSize,
     required Rect rect,
     BorderRadius? borderRadius,
@@ -86,6 +94,7 @@ class WebviewSubregionBox extends RenderBox implements MouseTrackerAnnotation {
   })  : _textureId = textureId,
         _filterQuality = filterQuality,
         _cursorListenable = cursorListenable,
+        _opaqueListenable = opaqueListenable,
         _textureSizeListenable = textureSize,
         _rect = rect,
         _borderRadius = borderRadius,
@@ -138,6 +147,27 @@ class WebviewSubregionBox extends RenderBox implements MouseTrackerAnnotation {
     if (attached) {
       _cursorListenable.addListener(_onCursorChanged);
     }
+  }
+
+  ValueListenable<bool> _opaqueListenable;
+
+  ValueListenable<bool> get opaqueListenable => _opaqueListenable;
+  set opaqueListenable(ValueListenable<bool> value) {
+    if (value != _opaqueListenable) {
+      if (attached) {
+        _opaqueListenable.removeListener(_onOpaqueChanged);
+      }
+
+      _opaqueListenable = value;
+
+      if (attached) {
+        _opaqueListenable.addListener(_onOpaqueChanged);
+      }
+    }
+  }
+
+  void _onOpaqueChanged() {
+    markNeedsPaint();
   }
 
   ValueListenable<Size> _textureSizeListenable;
@@ -228,7 +258,7 @@ class WebviewSubregionBox extends RenderBox implements MouseTrackerAnnotation {
   }
 
   @override
-  bool hitTestSelf(Offset position) => true;
+  bool hitTestSelf(Offset position) => _opaqueListenable.value;
 
   final LayerHandle<ContainerLayer> _clipLayer = LayerHandle<ContainerLayer>();
 
@@ -295,12 +325,14 @@ class WebviewSubregionBox extends RenderBox implements MouseTrackerAnnotation {
     _validForMouseTracker = true;
 
     cursorListenable.addListener(_onCursorChanged);
+    opaqueListenable.addListener(_onOpaqueChanged);
     textureSizeListenable.addListener(_onTextureSizeChanged);
   }
 
   @override
   void detach() {
     cursorListenable.removeListener(_onCursorChanged);
+    opaqueListenable.removeListener(_onOpaqueChanged);
     textureSizeListenable.removeListener(_onTextureSizeChanged);
 
     _validForMouseTracker = false;

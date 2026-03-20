@@ -116,6 +116,76 @@ TextureBridgeGpu::GetSurfaceDescriptor(size_t width, size_t height) {
   return &surface_descriptor_;
 }
 
+void TextureBridgeGpu::EnsureStagingTexture() {
+  if (staging_texture_) {
+    return;
+  }
+
+  D3D11_TEXTURE2D_DESC desc = {};
+  desc.ArraySize = 1;
+  desc.MipLevels = 1;
+  desc.BindFlags = 0;
+  desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+  desc.Format = static_cast<DXGI_FORMAT>(kPixelFormat);
+  desc.Width = 1;
+  desc.Height = 1;
+  desc.SampleDesc.Count = 1;
+  desc.SampleDesc.Quality = 0;
+  desc.Usage = D3D11_USAGE_STAGING;
+
+  if (!SUCCEEDED(graphics_context_->d3d_device()->CreateTexture2D(
+          &desc, nullptr, staging_texture_.put()))) {
+    std::cerr << "Creating staging texture for hit testing failed" << std::endl;
+  }
+}
+
+uint8_t TextureBridgeGpu::ReadAlpha(int x, int y) {
+  const std::lock_guard<std::mutex> lock(mutex_);
+
+  if (!last_frame_ || x < 0 || y < 0) {
+    return 255;
+  }
+
+  D3D11_TEXTURE2D_DESC frame_desc;
+  last_frame_->GetDesc(&frame_desc);
+
+  if (static_cast<UINT>(x) >= frame_desc.Width ||
+      static_cast<UINT>(y) >= frame_desc.Height) {
+    return 255;
+  }
+
+  EnsureStagingTexture();
+  if (!staging_texture_) {
+    return 255;
+  }
+
+  auto device_context = graphics_context_->d3d_device_context();
+
+  D3D11_BOX src_box = {};
+  src_box.left = static_cast<UINT>(x);
+  src_box.top = static_cast<UINT>(y);
+  src_box.right = src_box.left + 1;
+  src_box.bottom = src_box.top + 1;
+  src_box.front = 0;
+  src_box.back = 1;
+
+  device_context->CopySubresourceRegion(staging_texture_.get(), 0, 0, 0, 0,
+                                        last_frame_.get(), 0, &src_box);
+
+  D3D11_MAPPED_SUBRESOURCE mapped = {};
+  if (FAILED(device_context->Map(staging_texture_.get(), 0, D3D11_MAP_READ, 0,
+                                 &mapped))) {
+    return 255;
+  }
+
+  // BGRA format: B=0, G=1, R=2, A=3
+  uint8_t alpha = static_cast<uint8_t*>(mapped.pData)[3];
+
+  device_context->Unmap(staging_texture_.get(), 0);
+
+  return alpha;
+}
+
 void TextureBridgeGpu::StopInternal() {
   TextureBridge::StopInternal();
 
