@@ -424,14 +424,21 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   }
 
   /// Loads the given [url].
-  Future<void> loadUrl(String url) async {
+  ///
+  /// If [headers] is provided, the request will include the specified
+  /// HTTP headers. Headers are only applied to the initial navigation
+  /// request (not to redirects or sub-resource requests).
+  Future<void> loadUrl(String url, {Map<String, String>? headers}) async {
     if (_isDisposed) {
       return;
     }
 
     assert(value.isInitialized);
 
-    return _methodChannel.invokeMethod('loadUrl', url);
+    return _methodChannel.invokeMethod('loadUrl', {
+      'url': url,
+      if (headers != null) 'headers': headers,
+    });
   }
 
   /// Loads a document from the given string.

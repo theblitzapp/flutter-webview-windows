@@ -4,6 +4,7 @@
 #include <flutter/method_result_functions.h>
 
 #include <format>
+#include <map>
 
 #include "texture_bridge_gpu.h"
 
@@ -555,10 +556,26 @@ void WebviewBridge::HandleMethodCall(
     return result->Error(kErrorInvalidArgs);
   }
 
-  // loadUrl: string
+  // loadUrl: map with "url" (string) and optional "headers" (map<string,string>)
   if (method_name.compare(kMethodLoadUrl) == 0) {
-    if (const auto url = std::get_if<std::string>(method_call.arguments())) {
-      webview_->LoadUrl(*url);
+    if (const auto args =
+            std::get_if<flutter::EncodableMap>(method_call.arguments())) {
+      auto url_it = args->find(flutter::EncodableValue("url"));
+      if (url_it == args->end()) {
+        return result->Error(kErrorInvalidArgs);
+      }
+      const auto& url = std::get<std::string>(url_it->second);
+
+      std::map<std::string, std::string> headers;
+      auto headers_it = args->find(flutter::EncodableValue("headers"));
+      if (headers_it != args->end()) {
+        const auto& hmap = std::get<flutter::EncodableMap>(headers_it->second);
+        for (const auto& [k, v] : hmap) {
+          headers[std::get<std::string>(k)] = std::get<std::string>(v);
+        }
+      }
+
+      webview_->LoadUrl(url, headers);
       return result->Success();
     }
     return result->Error(kErrorInvalidArgs);

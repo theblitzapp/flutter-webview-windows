@@ -88,7 +88,9 @@ class _ExampleBrowser extends State<ExampleBrowser> {
         WebviewHostResourceAccessKind.allow,
       );
 
-      await _controller.loadUrl('https://flutter.dev');
+      await _controller.loadUrl('https://flutter.dev', headers: {
+        'X-Custom-Header': 'example-value',
+      });
 
       if (!mounted) return;
       setState(() {});

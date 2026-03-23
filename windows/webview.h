@@ -7,6 +7,7 @@
 #include <winrt/base.h>
 
 #include <functional>
+#include <map>
 #include <optional>
 #include <set>
 
@@ -164,7 +165,8 @@ class Webview {
                         double x, double y, double size, double pressure);
   void SetPointerButtonState(WebviewPointerButton button, bool isDown);
   void SetScrollDelta(double delta_x, double delta_y);
-  void LoadUrl(const std::string& url);
+  void LoadUrl(const std::string& url,
+               const std::map<std::string, std::string>& headers = {});
   void LoadStringContent(const std::string& content);
   bool Stop();
   bool Reload();

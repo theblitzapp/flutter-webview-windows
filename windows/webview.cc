@@ -817,9 +817,41 @@ void Webview::SetScrollDelta(double delta_x, double delta_y) {
   }
 }
 
-void Webview::LoadUrl(const std::string& url) {
-  if (IsValid()) {
+void Webview::LoadUrl(const std::string& url,
+                      const std::map<std::string, std::string>& headers) {
+  if (!IsValid()) {
+    return;
+  }
+
+  if (headers.empty()) {
     webview_->Navigate(util::Utf16FromUtf8(url).c_str());
+    return;
+  }
+
+  auto env = host_->environment();
+  wil::com_ptr<ICoreWebView2Environment2> env2;
+  if (FAILED(env->QueryInterface(IID_PPV_ARGS(&env2)))) {
+    return;
+  }
+
+  wil::com_ptr<ICoreWebView2WebResourceRequest> request;
+  if (FAILED(env2->CreateWebResourceRequest(
+          util::Utf16FromUtf8(url).c_str(), L"GET", nullptr, L"",
+          &request))) {
+    return;
+  }
+
+  wil::com_ptr<ICoreWebView2HttpRequestHeaders> request_headers;
+  if (SUCCEEDED(request->get_Headers(&request_headers))) {
+    for (const auto& [key, value] : headers) {
+      request_headers->SetHeader(util::Utf16FromUtf8(key).c_str(),
+                                 util::Utf16FromUtf8(value).c_str());
+    }
+  }
+
+  wil::com_ptr<ICoreWebView2_2> webview2;
+  if (SUCCEEDED(webview_->QueryInterface(IID_PPV_ARGS(&webview2)))) {
+    webview2->NavigateWithWebResourceRequest(request.get());
   }
 }
 
