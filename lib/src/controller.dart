@@ -745,6 +745,9 @@ class WebviewController extends ValueNotifier<WebviewValue> {
 
   /// Sets extra HTTP headers that will be included in every request made by
   /// this webview instance (navigations, sub-resources, XHR, etc.).
+  ///
+  /// These are global headers applied to all requests. Domain-specific headers
+  /// set via [setDomainExtraHeaders] take precedence for matching domains.
   Future<void> setExtraHeaders(Map<String, String> headers) async {
     if (_isDisposed) {
       return;
@@ -753,6 +756,27 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('setExtraHeaders', headers);
+  }
+
+  /// Sets extra HTTP headers for requests to a specific [domain].
+  ///
+  /// These headers are merged with the global headers set via
+  /// [setExtraHeaders], with domain-specific headers taking precedence when
+  /// both define the same header name.
+  ///
+  /// Pass an empty map for [headers] to remove the domain-specific headers.
+  Future<void> setDomainExtraHeaders(
+    String domain,
+    Map<String, String> headers,
+  ) async {
+    if (_isDisposed) {
+      return;
+    }
+
+    assert(value.isInitialized);
+
+    return _methodChannel
+        .invokeMethod('setDomainExtraHeaders', [domain, headers]);
   }
 
   /// Limits the number of frames per second to the given value.

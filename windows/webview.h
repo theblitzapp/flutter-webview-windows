@@ -199,6 +199,8 @@ class Webview {
   bool ClearVirtualHostNameMapping(const std::string& hostName);
 
   void SetExtraHeaders(const std::map<std::string, std::string>& headers);
+  void SetDomainExtraHeaders(const std::string& domain,
+                             const std::map<std::string, std::string>& headers);
 
   void UpdateDownloadProgress(ICoreWebView2DownloadOperation* download);
 
@@ -305,6 +307,8 @@ class Webview {
   std::set<UINT64> intercepted_navigation_ids_;
   int navigation_intercept_id_ = 0;
   std::map<std::string, std::string> extra_headers_;
+  std::map<std::string, std::map<std::string, std::string>>
+      domain_extra_headers_;
   bool extra_headers_filter_registered_ = false;
 
   Webview(
@@ -319,4 +323,6 @@ class Webview {
 
   void EnableSecurityUpdates();
   void SendScroll(double offset, bool horizontal);
+  void EnsureExtraHeadersFilterRegistered();
+  static std::string ExtractHostname(const std::string& url);
 };

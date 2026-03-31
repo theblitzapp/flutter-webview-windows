@@ -1034,14 +1034,22 @@ bool Webview::SetVirtualHostNameMapping(
       accessKindIntValue);
 }
 
-void Webview::SetExtraHeaders(
-    const std::map<std::string, std::string>& headers) {
-  if (!IsValid()) {
-    return;
+std::string Webview::ExtractHostname(const std::string& url) {
+  auto scheme_end = url.find("://");
+  if (scheme_end == std::string::npos) {
+    return {};
   }
 
-  extra_headers_ = headers;
+  auto host_start = scheme_end + 3;
+  auto host_end = url.find_first_of("/:", host_start);
+  if (host_end == std::string::npos) {
+    return url.substr(host_start);
+  }
 
+  return url.substr(host_start, host_end - host_start);
+}
+
+void Webview::EnsureExtraHeadersFilterRegistered() {
   if (extra_headers_filter_registered_) {
     return;
   }
@@ -1056,20 +1064,65 @@ void Webview::SetExtraHeaders(
           [this](ICoreWebView2* sender,
                  ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
             wil::com_ptr<ICoreWebView2WebResourceRequest> request;
-            if (SUCCEEDED(args->get_Request(&request))) {
-              wil::com_ptr<ICoreWebView2HttpRequestHeaders> request_headers;
-              if (SUCCEEDED(request->get_Headers(&request_headers))) {
-                for (const auto& [key, value] : extra_headers_) {
+            if (FAILED(args->get_Request(&request))) {
+              return S_OK;
+            }
+
+            wil::com_ptr<ICoreWebView2HttpRequestHeaders> request_headers;
+            if (FAILED(request->get_Headers(&request_headers))) {
+              return S_OK;
+            }
+
+            for (const auto& [key, value] : extra_headers_) {
+              request_headers->SetHeader(util::Utf16FromUtf8(key).c_str(),
+                                         util::Utf16FromUtf8(value).c_str());
+            }
+
+            wil::unique_cotaskmem_string wuri;
+            if (SUCCEEDED(request->get_Uri(&wuri))) {
+              std::string uri = util::Utf8FromUtf16(wuri.get());
+              std::string hostname = ExtractHostname(uri);
+
+              auto it = domain_extra_headers_.find(hostname);
+              if (it != domain_extra_headers_.end()) {
+                for (const auto& [key, value] : it->second) {
                   request_headers->SetHeader(
                       util::Utf16FromUtf8(key).c_str(),
                       util::Utf16FromUtf8(value).c_str());
                 }
               }
             }
+
             return S_OK;
           })
           .Get(),
       &event_registrations_.web_resource_requested_token_);
+}
+
+void Webview::SetExtraHeaders(
+    const std::map<std::string, std::string>& headers) {
+  if (!IsValid()) {
+    return;
+  }
+
+  extra_headers_ = headers;
+  EnsureExtraHeadersFilterRegistered();
+}
+
+void Webview::SetDomainExtraHeaders(
+    const std::string& domain,
+    const std::map<std::string, std::string>& headers) {
+  if (!IsValid()) {
+    return;
+  }
+
+  if (headers.empty()) {
+    domain_extra_headers_.erase(domain);
+  } else {
+    domain_extra_headers_[domain] = headers;
+  }
+
+  EnsureExtraHeadersFilterRegistered();
 }
 
 bool Webview::ClearVirtualHostNameMapping(const std::string& hostName) {

@@ -47,6 +47,7 @@ constexpr auto kMethodSetTrackingPreventionLevel = "setTrackingPreventionLevel";
 constexpr auto kMethodSetTransparencyHitTestingEnabled =
     "setTransparencyHitTestingEnabled";
 constexpr auto kMethodSetExtraHeaders = "setExtraHeaders";
+constexpr auto kMethodSetDomainExtraHeaders = "setDomainExtraHeaders";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -862,6 +863,26 @@ void WebviewBridge::HandleMethodCall(
       }
       webview_->SetExtraHeaders(headers);
       return result->Success();
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  if (method_name.compare(kMethodSetDomainExtraHeaders) == 0) {
+    if (const auto args =
+            std::get_if<flutter::EncodableList>(method_call.arguments())) {
+      if (args->size() == 2) {
+        const auto* domain = std::get_if<std::string>(&(*args)[0]);
+        const auto* header_map =
+            std::get_if<flutter::EncodableMap>(&(*args)[1]);
+        if (domain && header_map) {
+          std::map<std::string, std::string> headers;
+          for (const auto& [k, v] : *header_map) {
+            headers[std::get<std::string>(k)] = std::get<std::string>(v);
+          }
+          webview_->SetDomainExtraHeaders(*domain, headers);
+          return result->Success();
+        }
+      }
     }
     return result->Error(kErrorInvalidArgs);
   }
