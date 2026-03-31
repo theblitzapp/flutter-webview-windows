@@ -743,6 +743,18 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     }
   }
 
+  /// Sets extra HTTP headers that will be included in every request made by
+  /// this webview instance (navigations, sub-resources, XHR, etc.).
+  Future<void> setExtraHeaders(Map<String, String> headers) async {
+    if (_isDisposed) {
+      return;
+    }
+
+    assert(value.isInitialized);
+
+    return _methodChannel.invokeMethod('setExtraHeaders', headers);
+  }
+
   /// Limits the number of frames per second to the given value.
   Future<void> setFpsLimit([int? maxFps = 0]) async {
     if (_isDisposed) {

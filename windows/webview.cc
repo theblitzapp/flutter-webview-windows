@@ -525,6 +525,11 @@ void Webview::UnregisterEventHandlers() {
     webview_->remove_ContainsFullScreenElementChanged(
         event_registrations_.contains_fullscreen_element_changed_token_);
 
+    if (extra_headers_filter_registered_) {
+      webview_->remove_WebResourceRequested(
+          event_registrations_.web_resource_requested_token_);
+    }
+
     // Download events (ICoreWebView2_4)
     auto webview24 = webview_.try_query<ICoreWebView2_4>();
     if (webview24) {
@@ -835,9 +840,8 @@ void Webview::LoadUrl(const std::string& url,
   }
 
   wil::com_ptr<ICoreWebView2WebResourceRequest> request;
-  if (FAILED(env2->CreateWebResourceRequest(
-          util::Utf16FromUtf8(url).c_str(), L"GET", nullptr, L"",
-          &request))) {
+  if (FAILED(env2->CreateWebResourceRequest(util::Utf16FromUtf8(url).c_str(),
+                                            L"GET", nullptr, L"", &request))) {
     return;
   }
 
@@ -1028,6 +1032,44 @@ bool Webview::SetVirtualHostNameMapping(
   return webview->SetVirtualHostNameToFolderMapping(
       util::Utf16FromUtf8(hostName).c_str(), util::Utf16FromUtf8(path).c_str(),
       accessKindIntValue);
+}
+
+void Webview::SetExtraHeaders(
+    const std::map<std::string, std::string>& headers) {
+  if (!IsValid()) {
+    return;
+  }
+
+  extra_headers_ = headers;
+
+  if (extra_headers_filter_registered_) {
+    return;
+  }
+
+  extra_headers_filter_registered_ = true;
+
+  webview_->AddWebResourceRequestedFilter(
+      L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+
+  webview_->add_WebResourceRequested(
+      Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+          [this](ICoreWebView2* sender,
+                 ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+            wil::com_ptr<ICoreWebView2WebResourceRequest> request;
+            if (SUCCEEDED(args->get_Request(&request))) {
+              wil::com_ptr<ICoreWebView2HttpRequestHeaders> request_headers;
+              if (SUCCEEDED(request->get_Headers(&request_headers))) {
+                for (const auto& [key, value] : extra_headers_) {
+                  request_headers->SetHeader(
+                      util::Utf16FromUtf8(key).c_str(),
+                      util::Utf16FromUtf8(value).c_str());
+                }
+              }
+            }
+            return S_OK;
+          })
+          .Get(),
+      &event_registrations_.web_resource_requested_token_);
 }
 
 bool Webview::ClearVirtualHostNameMapping(const std::string& hostName) {

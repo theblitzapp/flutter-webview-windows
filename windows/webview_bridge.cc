@@ -46,6 +46,7 @@ constexpr auto kMethodSetDevToolsEnabled = "setDevToolsEnabled";
 constexpr auto kMethodSetTrackingPreventionLevel = "setTrackingPreventionLevel";
 constexpr auto kMethodSetTransparencyHitTestingEnabled =
     "setTransparencyHitTestingEnabled";
+constexpr auto kMethodSetExtraHeaders = "setExtraHeaders";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -848,6 +849,20 @@ void WebviewBridge::HandleMethodCall(
                            "Setting tracking prevention level failed.");
     }
 
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setExtraHeaders: map<string, string>
+  if (method_name.compare(kMethodSetExtraHeaders) == 0) {
+    if (const auto args =
+            std::get_if<flutter::EncodableMap>(method_call.arguments())) {
+      std::map<std::string, std::string> headers;
+      for (const auto& [k, v] : *args) {
+        headers[std::get<std::string>(k)] = std::get<std::string>(v);
+      }
+      webview_->SetExtraHeaders(headers);
+      return result->Success();
+    }
     return result->Error(kErrorInvalidArgs);
   }
 

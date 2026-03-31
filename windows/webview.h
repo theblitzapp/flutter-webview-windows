@@ -108,6 +108,7 @@ struct EventRegistrations {
   EventRegistrationToken download_bytes_received_token_{};
   EventRegistrationToken download_state_changed_token_{};
   EventRegistrationToken navigation_starting_token_{};
+  EventRegistrationToken web_resource_requested_token_{};
 };
 
 class Webview {
@@ -196,6 +197,8 @@ class Webview {
                                  const std::string& path,
                                  WebviewHostResourceAccessKind accessKind);
   bool ClearVirtualHostNameMapping(const std::string& hostName);
+
+  void SetExtraHeaders(const std::map<std::string, std::string>& headers);
 
   void UpdateDownloadProgress(ICoreWebView2DownloadOperation* download);
 
@@ -301,6 +304,8 @@ class Webview {
   std::optional<std::string> navigation_starting_allowed_url_;
   std::set<UINT64> intercepted_navigation_ids_;
   int navigation_intercept_id_ = 0;
+  std::map<std::string, std::string> extra_headers_;
+  bool extra_headers_filter_registered_ = false;
 
   Webview(
       wil::com_ptr<ICoreWebView2CompositionController> composition_controller,
