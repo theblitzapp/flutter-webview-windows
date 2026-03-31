@@ -324,5 +324,4 @@ class Webview {
   void EnableSecurityUpdates();
   void SendScroll(double offset, bool horizontal);
   void EnsureExtraHeadersFilterRegistered();
-  static std::string ExtractHostname(const std::string& url);
 };

@@ -88,7 +88,8 @@ class _ExampleBrowser extends State<ExampleBrowser> {
         WebviewHostResourceAccessKind.allow,
       );
 
-      await _controller.setExtraHeaders({
+      await _controller.setDomainExtraHeaders('*://flutter.dev/*', {
+        // 'Accept-Language': 'flutter',
         'X-Custom-Header1': 'example-value',
       });
 
