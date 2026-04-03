@@ -9,9 +9,10 @@ void main() {
   testWidgets(
     'disposing of a webview does not cause a crash',
     (WidgetTester tester) async {
+      final host = await WebviewHost.create();
+
       for (var i = 0; i < 16; i++) {
-        final controller = WebviewController();
-        await controller.initialize();
+        final controller = await WebviewController.create(host);
 
         await tester.pumpWidget(Webview(
           key: ValueKey(i),
