@@ -143,12 +143,10 @@ class _WebviewSubregionState extends State<WebviewSubregion> {
 
   @override
   Widget build(BuildContext context) {
-    final Widget? child;
-
-    if (!widget.controller.value.isInitialized) {
-      child = null;
-    } else {
-      child = Listener(
+    return SizedBox(
+      width: widget.subregion.width,
+      height: widget.subregion.height,
+      child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerHover: _onPointerHover,
         onPointerDown: _onPointerDown,
@@ -166,13 +164,7 @@ class _WebviewSubregionState extends State<WebviewSubregion> {
           subregion: widget.subregion,
           borderRadius: widget.borderRadius,
         ),
-      );
-    }
-
-    return SizedBox(
-      width: widget.subregion.width,
-      height: widget.subregion.height,
-      child: child,
+      ),
     );
   }
 }

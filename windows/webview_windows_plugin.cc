@@ -22,15 +22,14 @@ namespace {
 constexpr auto kMethodInitialize = "initialize";
 constexpr auto kMethodDispose = "dispose";
 constexpr auto kMethodDisposeAll = "disposeAll";
-constexpr auto kMethodInitializeEnvironment = "initializeEnvironment";
+constexpr auto kMethodCreateHost = "createHost";
+constexpr auto kMethodDisposeHost = "disposeHost";
 constexpr auto kMethodGetWebViewVersion = "getWebViewVersion";
 constexpr auto kMethodGetProcessIds = "getProcessIds";
 
 constexpr auto kErrorCodeInvalidId = "invalid_id";
 constexpr auto kErrorCodeEnvironmentCreationFailed =
     "environment_creation_failed";
-constexpr auto kErrorCodeEnvironmentAlreadyInitialized =
-    "environment_already_initialized";
 constexpr auto kErrorCodeWebviewCreationFailed = "webview_creation_failed";
 constexpr auto kErrorUnsupportedPlatform = "unsupported_platform";
 
@@ -47,6 +46,25 @@ std::optional<T> GetOptionalValue(const flutter::EncodableMap& map,
   return std::nullopt;
 }
 
+std::optional<int64_t> GetInt64Value(const flutter::EncodableMap& map,
+                                     const std::string& key) {
+  const auto it = map.find(flutter::EncodableValue(key));
+  if (it != map.end()) {
+    if (const auto* v = std::get_if<int64_t>(&it->second)) return *v;
+    if (const auto* v = std::get_if<int32_t>(&it->second))
+      return static_cast<int64_t>(*v);
+  }
+  return std::nullopt;
+}
+
+std::optional<int64_t> GetInt64Arg(const flutter::EncodableValue* val) {
+  if (!val) return std::nullopt;
+  if (const auto* v = std::get_if<int64_t>(val)) return *v;
+  if (const auto* v = std::get_if<int32_t>(val))
+    return static_cast<int64_t>(*v);
+  return std::nullopt;
+}
+
 class WebviewWindowsPlugin : public flutter::Plugin {
  public:
   static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar);
@@ -58,8 +76,10 @@ class WebviewWindowsPlugin : public flutter::Plugin {
 
  private:
   std::unique_ptr<WebviewPlatform> platform_;
-  std::unique_ptr<WebviewHost> webview_host_;
+  std::unordered_map<int64_t, std::unique_ptr<WebviewHost>> hosts_;
   std::unordered_map<int64_t, std::unique_ptr<WebviewBridge>> instances_;
+  std::unordered_map<int64_t, int64_t> instance_host_;
+  int64_t next_host_id_ = 1;
 
   WNDCLASS window_class_ = {};
   flutter::TextureRegistrar* textures_;
@@ -67,8 +87,15 @@ class WebviewWindowsPlugin : public flutter::Plugin {
 
   bool InitPlatform();
 
+  void HandleCreateHost(
+      const flutter::EncodableMap& args,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+  void HandleDisposeHost(
+      int64_t host_id,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
   void CreateWebviewInstance(
-      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>);
+      int64_t host_id,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue>& method_call,
@@ -110,45 +137,20 @@ WebviewWindowsPlugin::~WebviewWindowsPlugin() {
 void WebviewWindowsPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-  if (method_call.method_name().compare(kMethodInitializeEnvironment) == 0) {
-    if (webview_host_) {
-      return result->Error(kErrorCodeEnvironmentAlreadyInitialized,
-                           "The webview environment is already initialized");
-    }
-
+  if (method_call.method_name().compare(kMethodCreateHost) == 0) {
     if (!InitPlatform()) {
       return result->Error(kErrorUnsupportedPlatform,
                            "The platform is not supported");
     }
-
     const auto& map = std::get<flutter::EncodableMap>(*method_call.arguments());
+    return HandleCreateHost(map, std::move(result));
+  }
 
-    std::optional<std::wstring> browser_exe_wpath = std::nullopt;
-    std::optional<std::string> browser_exe_path =
-        GetOptionalValue<std::string>(map, "browserExePath");
-    if (browser_exe_path) {
-      browser_exe_wpath = util::Utf16FromUtf8(*browser_exe_path);
+  if (method_call.method_name().compare(kMethodDisposeHost) == 0) {
+    if (const auto host_id = GetInt64Arg(method_call.arguments())) {
+      return HandleDisposeHost(*host_id, std::move(result));
     }
-
-    std::optional<std::wstring> user_data_wpath = std::nullopt;
-    std::optional<std::string> user_data_path =
-        GetOptionalValue<std::string>(map, "userDataPath");
-    if (user_data_path) {
-      user_data_wpath = util::Utf16FromUtf8(*user_data_path);
-    } else {
-      user_data_wpath = platform_->GetDefaultDataDirectory();
-    }
-
-    std::optional<std::string> additional_args =
-        GetOptionalValue<std::string>(map, "additionalArguments");
-
-    webview_host_ = std::move(WebviewHost::Create(
-        platform_.get(), user_data_wpath, browser_exe_wpath, additional_args));
-    if (!webview_host_) {
-      return result->Error(kErrorCodeEnvironmentCreationFailed);
-    }
-
-    return result->Success();
+    return result->Error(kErrorCodeInvalidId, "Invalid host id");
   }
 
   if (method_call.method_name().compare(kMethodGetWebViewVersion) == 0) {
@@ -164,13 +166,22 @@ void WebviewWindowsPlugin::HandleMethodCall(
   }
 
   if (method_call.method_name().compare(kMethodGetProcessIds) == 0) {
-    if (!webview_host_) {
-      return result->Error(kErrorCodeEnvironmentCreationFailed,
-                           "The webview environment is not initialized");
+    const auto* args_map =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (!args_map) {
+      return result->Error(kErrorCodeInvalidId, "Expected map argument");
+    }
+    auto host_id_opt = GetInt64Value(*args_map, "hostId");
+    if (!host_id_opt) {
+      return result->Error(kErrorCodeInvalidId, "Missing hostId");
+    }
+    const auto host_it = hosts_.find(*host_id_opt);
+    if (host_it == hosts_.end()) {
+      return result->Error(kErrorCodeInvalidId, "Unknown hostId");
     }
 
     auto env13 =
-        webview_host_->environment().try_query<ICoreWebView2Environment13>();
+        host_it->second->environment().try_query<ICoreWebView2Environment13>();
     if (!env13) {
       return result->Error("not_supported",
                            "ICoreWebView2Environment13 is not available");
@@ -217,20 +228,32 @@ void WebviewWindowsPlugin::HandleMethodCall(
   }
 
   if (method_call.method_name().compare(kMethodInitialize) == 0) {
-    return CreateWebviewInstance(std::move(result));
+    const auto* args_map =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (!args_map) {
+      return result->Error(kErrorCodeInvalidId, "Expected map argument");
+    }
+    auto host_id_opt = GetInt64Value(*args_map, "hostId");
+    if (!host_id_opt) {
+      return result->Error(kErrorCodeInvalidId, "Missing hostId");
+    }
+    return CreateWebviewInstance(*host_id_opt, std::move(result));
   }
 
   if (method_call.method_name().compare(kMethodDisposeAll) == 0) {
     instances_.clear();
+    instance_host_.clear();
+    hosts_.clear();
 
     return result->Success();
   }
 
   if (method_call.method_name().compare(kMethodDispose) == 0) {
-    if (const auto texture_id = std::get_if<int64_t>(method_call.arguments())) {
+    if (const auto texture_id = GetInt64Arg(method_call.arguments())) {
       const auto it = instances_.find(*texture_id);
       if (it != instances_.end()) {
         instances_.erase(it);
+        instance_host_.erase(*texture_id);
         return result->Success();
       }
     }
@@ -240,19 +263,76 @@ void WebviewWindowsPlugin::HandleMethodCall(
   }
 }
 
+void WebviewWindowsPlugin::HandleCreateHost(
+    const flutter::EncodableMap& args,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  std::optional<std::wstring> browser_exe_wpath = std::nullopt;
+  auto browser_exe_path = GetOptionalValue<std::string>(args, "browserExePath");
+  if (browser_exe_path) {
+    browser_exe_wpath = util::Utf16FromUtf8(*browser_exe_path);
+  }
+
+  std::optional<std::wstring> user_data_wpath = std::nullopt;
+  auto user_data_path = GetOptionalValue<std::string>(args, "userDataPath");
+  if (user_data_path) {
+    user_data_wpath = util::Utf16FromUtf8(*user_data_path);
+  }
+
+  auto additional_args =
+      GetOptionalValue<std::string>(args, "additionalArguments");
+
+  auto host = WebviewHost::Create(platform_.get(), user_data_wpath,
+                                  browser_exe_wpath, additional_args);
+  if (!host) {
+    return result->Error(kErrorCodeEnvironmentCreationFailed,
+                         "Failed to create WebView2 environment");
+  }
+
+  int64_t host_id = next_host_id_++;
+  hosts_[host_id] = std::move(host);
+
+  auto response = flutter::EncodableValue(flutter::EncodableMap{
+      {flutter::EncodableValue("hostId"), flutter::EncodableValue(host_id)},
+  });
+  result->Success(response);
+}
+
+void WebviewWindowsPlugin::HandleDisposeHost(
+    int64_t host_id,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  const auto host_it = hosts_.find(host_id);
+  if (host_it == hosts_.end()) {
+    return result->Error(kErrorCodeInvalidId, "Unknown hostId");
+  }
+
+  // Erase all webview bridges belonging to this host first, so the
+  // Webview objects are released before the environment is destroyed.
+  std::vector<int64_t> to_remove;
+  for (const auto& [texture_id, owner_host_id] : instance_host_) {
+    if (owner_host_id == host_id) {
+      to_remove.push_back(texture_id);
+    }
+  }
+  for (int64_t texture_id : to_remove) {
+    instances_.erase(texture_id);
+    instance_host_.erase(texture_id);
+  }
+
+  hosts_.erase(host_it);
+  result->Success();
+}
+
 void WebviewWindowsPlugin::CreateWebviewInstance(
+    int64_t host_id,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
   if (!InitPlatform()) {
     return result->Error(kErrorUnsupportedPlatform,
                          "The platform is not supported");
   }
 
-  if (!webview_host_) {
-    webview_host_ = std::move(WebviewHost::Create(
-        platform_.get(), platform_->GetDefaultDataDirectory()));
-    if (!webview_host_) {
-      return result->Error(kErrorCodeEnvironmentCreationFailed);
-    }
+  const auto host_it = hosts_.find(host_id);
+  if (host_it == hosts_.end()) {
+    return result->Error(kErrorCodeInvalidId, "Unknown hostId");
   }
 
   auto hwnd =
@@ -261,10 +341,11 @@ void WebviewWindowsPlugin::CreateWebviewInstance(
 
   std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
       shared_result = std::move(result);
-  webview_host_->CreateWebview(
+  host_it->second->CreateWebview(
       hwnd, true, true,
-      [shared_result, this](std::unique_ptr<Webview> webview,
-                            std::unique_ptr<WebviewCreationError> error) {
+      [shared_result, host_id, this](
+          std::unique_ptr<Webview> webview,
+          std::unique_ptr<WebviewCreationError> error) {
         if (!webview) {
           if (error) {
             return shared_result->Error(
@@ -282,6 +363,7 @@ void WebviewWindowsPlugin::CreateWebviewInstance(
             std::move(webview));
         auto texture_id = bridge->texture_id();
         instances_[texture_id] = std::move(bridge);
+        instance_host_[texture_id] = host_id;
 
         auto response = flutter::EncodableValue(flutter::EncodableMap{
             {flutter::EncodableValue("textureId"),

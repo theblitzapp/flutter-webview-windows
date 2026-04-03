@@ -1,4 +1,5 @@
 export 'src/controller.dart';
+export 'src/webview_host.dart';
 export 'src/models/cross_origin_request.dart';
 export 'src/models/download_event.dart';
 export 'src/models/error_status.dart';

@@ -17,57 +17,13 @@ import 'package:webview_windows/src/models/script_id.dart';
 import 'package:webview_windows/src/models/tracking_prevention.dart';
 
 import 'cursor.dart';
-
-@immutable
-class WebviewValue {
-  @internal
-  const WebviewValue({
-    required this.isInitialized,
-  });
-
-  @internal
-  WebviewValue.uninitialized() : this(isInitialized: false);
-
-  final bool isInitialized;
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    return other is WebviewValue && other.isInitialized == isInitialized;
-  }
-
-  @override
-  int get hashCode => isInitialized.hashCode;
-}
+import 'webview_host.dart';
 
 /// Controls a WebView and provides streams for various change events.
-class WebviewController extends ValueNotifier<WebviewValue> {
+class WebviewController {
   static const String _pluginChannelPrefix = 'io.jns.webview.win';
   static const MethodChannel _pluginChannel =
       MethodChannel(_pluginChannelPrefix);
-
-  /// Explicitly initializes the underlying WebView environment
-  /// using  an optional [browserExePath], an optional [userDataPath]
-  /// and optional Chromium command line arguments [additionalArguments].
-  ///
-  /// The environment is shared between all WebviewController instances and
-  /// can be initialized only once. Initialization must take place before any
-  /// WebviewController is created/initialized.
-  ///
-  /// Throws [PlatformException] if the environment was initialized before.
-  static Future<void> initializeEnvironment({
-    String? userDataPath,
-    String? browserExePath,
-    String? additionalArguments,
-  }) async {
-    return _pluginChannel
-        .invokeMethod('initializeEnvironment', <String, Object?>{
-      'userDataPath': userDataPath,
-      'browserExePath': browserExePath,
-      'additionalArguments': additionalArguments
-    });
-  }
 
   /// Get the browser version info including channel name if it is not the
   /// WebView2 Runtime.
@@ -76,31 +32,43 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     return _pluginChannel.invokeMethod<String>('getWebViewVersion');
   }
 
-  /// Returns the OS process IDs for all processes associated with the
-  /// WebView2 environment.
-  static Future<List<int>> getProcessIds() async {
-    final result = await _pluginChannel.invokeListMethod<int>('getProcessIds');
-    return result ?? const [];
+  /// Creates and initializes a new [WebviewController] inside [host].
+  static Future<WebviewController> create(WebviewHost host) async {
+    final reply = await _pluginChannel.invokeMapMethod<String, Object?>(
+      'initialize',
+      <String, Object?>{'hostId': host.hostId},
+    );
+
+    if (reply == null) {
+      throw PlatformException(
+        code: 'initialize_failed',
+        message: 'Unexpected response from the plugin',
+      );
+    }
+
+    final textureId = reply['textureId'] as int;
+    final controller = WebviewController._(textureId: textureId);
+    controller._setupEventHandlers();
+    return controller;
   }
 
-  static bool _staleInstancesCleared = false;
+  WebviewController._({
+    required int textureId,
+  })  : _textureId = textureId,
+        _methodChannel = MethodChannel('$_pluginChannelPrefix/$textureId'),
+        _eventChannel = EventChannel('$_pluginChannelPrefix/$textureId/events');
 
-  WebviewController() : super(WebviewValue.uninitialized());
-
-  late Completer<void> _creatingCompleter;
   bool _isDisposed = false;
-
-  Future<void> get ready => _creatingCompleter.future;
 
   PermissionRequestedDelegate? _permissionRequested;
   NavigationStartingDelegate? _navigationStarting;
   NewWindowRequestedDelegate? _newWindowRequested;
 
-  late MethodChannel _methodChannel;
-  late EventChannel _eventChannel;
+  final MethodChannel _methodChannel;
+  final EventChannel _eventChannel;
   StreamSubscription? _eventStreamSubscription;
 
-  int _textureId = 0;
+  final int _textureId;
 
   /// The texture ID that was assigned to the webview surface by Flutter.
   int get textureId => _textureId;
@@ -177,148 +145,110 @@ class WebviewController extends ValueNotifier<WebviewValue> {
   ValueListenable<bool> get isPointerOverOpaqueContent =>
       _isPointerOverOpaqueContent;
 
-  /// Initializes the underlying platform view.
-  Future<void> initialize() async {
-    if (_isDisposed) {
-      return Future<void>.value();
-    }
+  void _setupEventHandlers() {
+    _eventStreamSubscription =
+        _eventChannel.receiveBroadcastStream().listen((event) {
+      final map = event as Map<dynamic, dynamic>;
 
-    if (kDebugMode && !_staleInstancesCleared) {
-      _staleInstancesCleared = true;
+      switch (map['type']) {
+        case 'urlChanged':
+          _urlNotifier.value = map['value'];
+          break;
 
-      await _pluginChannel.invokeMethod('disposeAll');
-    }
+        case 'onLoadError':
+          _onLoadErrorStreamController.add(
+            WebErrorStatus.values[map['value']],
+          );
 
-    _creatingCompleter = Completer<void>();
+          break;
 
-    try {
-      final reply =
-          await _pluginChannel.invokeMapMethod<String, Object?>('initialize');
+        case 'loadingStateChanged':
+          _loadingStateNotifier.value = LoadingState.values[map['value']];
 
-      if (reply == null) {
-        throw PlatformException(
-          code: 'initialize_failed',
-          message: 'Unexpected response from the plugin',
-        );
+          break;
+
+        case 'downloadEvent':
+          _downloadEventStreamController.add(
+            WebviewDownloadEvent(
+              WebviewDownloadEventKind.values[map['value']['kind']],
+              map['value']['url'],
+              map['value']['resultFilePath'],
+              map['value']['bytesReceived'],
+              map['value']['totalBytesToReceive'],
+            ),
+          );
+
+          break;
+
+        case 'historyChanged':
+          _historyStateNotifier.value = HistoryChanged(
+            canGoBack: map['value']['canGoBack'],
+            canGoForward: map['value']['canGoForward'],
+          );
+
+          break;
+
+        case 'securityStateChanged':
+          _securityStateNotifier.value = map['value'];
+
+          break;
+
+        case 'titleChanged':
+          _titleNotifier.value = map['value'];
+
+          break;
+
+        case 'cursorChanged':
+          _cursorNotifier.value = getCursorByName(map['value']);
+
+          break;
+
+        case 'webMessageReceived':
+          try {
+            final message = json.decode(map['value']);
+
+            _webMessageStreamController.add(message);
+          } catch (ex) {
+            _webMessageStreamController.addError(ex);
+          }
+
+          break;
+
+        case 'containsFullScreenElementChanged':
+          _containsFullScreenElementNotifier.value = map['value'];
+
+          break;
+
+        case 'sizeChanged':
+          _sizeNotifier.value = Size(
+            (map['value']['width'] as num).toDouble(),
+            (map['value']['height'] as num).toDouble(),
+          );
+
+          break;
+
+        case 'pointerTransparencyChanged':
+          _isPointerOverOpaqueContent.value = map['value'] as bool;
+
+          break;
+      }
+    });
+
+    _methodChannel.setMethodCallHandler((call) {
+      if (call.method == 'permissionRequested') {
+        return _onPermissionRequested(call.arguments as Map<dynamic, dynamic>);
       }
 
-      _textureId = reply['textureId'] as int;
-      _methodChannel = MethodChannel('$_pluginChannelPrefix/$_textureId');
-      _eventChannel = EventChannel('$_pluginChannelPrefix/$_textureId/events');
+      if (call.method == 'navigationStarting') {
+        return _onNavigationStarting(call.arguments as Map<dynamic, dynamic>);
+      }
 
-      _eventStreamSubscription =
-          _eventChannel.receiveBroadcastStream().listen((event) {
-        final map = event as Map<dynamic, dynamic>;
+      if (call.method == 'newWindowRequested') {
+        return _onNewWindowRequested(call.arguments as Map<dynamic, dynamic>);
+      }
 
-        switch (map['type']) {
-          case 'urlChanged':
-            _urlNotifier.value = map['value'];
-            break;
-
-          case 'onLoadError':
-            _onLoadErrorStreamController.add(
-              WebErrorStatus.values[map['value']],
-            );
-
-            break;
-
-          case 'loadingStateChanged':
-            _loadingStateNotifier.value = LoadingState.values[map['value']];
-
-            break;
-
-          case 'downloadEvent':
-            _downloadEventStreamController.add(
-              WebviewDownloadEvent(
-                WebviewDownloadEventKind.values[map['value']['kind']],
-                map['value']['url'],
-                map['value']['resultFilePath'],
-                map['value']['bytesReceived'],
-                map['value']['totalBytesToReceive'],
-              ),
-            );
-
-            break;
-
-          case 'historyChanged':
-            _historyStateNotifier.value = HistoryChanged(
-              canGoBack: map['value']['canGoBack'],
-              canGoForward: map['value']['canGoForward'],
-            );
-
-            break;
-
-          case 'securityStateChanged':
-            _securityStateNotifier.value = map['value'];
-
-            break;
-
-          case 'titleChanged':
-            _titleNotifier.value = map['value'];
-
-            break;
-
-          case 'cursorChanged':
-            _cursorNotifier.value = getCursorByName(map['value']);
-
-            break;
-
-          case 'webMessageReceived':
-            try {
-              final message = json.decode(map['value']);
-
-              _webMessageStreamController.add(message);
-            } catch (ex) {
-              _webMessageStreamController.addError(ex);
-            }
-
-            break;
-
-          case 'containsFullScreenElementChanged':
-            _containsFullScreenElementNotifier.value = map['value'];
-
-            break;
-
-          case 'sizeChanged':
-            _sizeNotifier.value = Size(
-              (map['value']['width'] as num).toDouble(),
-              (map['value']['height'] as num).toDouble(),
-            );
-
-            break;
-
-          case 'pointerTransparencyChanged':
-            _isPointerOverOpaqueContent.value = map['value'] as bool;
-
-            break;
-        }
-      });
-
-      _methodChannel.setMethodCallHandler((call) {
-        if (call.method == 'permissionRequested') {
-          return _onPermissionRequested(
-              call.arguments as Map<dynamic, dynamic>);
-        }
-
-        if (call.method == 'navigationStarting') {
-          return _onNavigationStarting(call.arguments as Map<dynamic, dynamic>);
-        }
-
-        if (call.method == 'newWindowRequested') {
-          return _onNewWindowRequested(call.arguments as Map<dynamic, dynamic>);
-        }
-
-        throw MissingPluginException('Unknown method ${call.method}');
-      });
-
-      value = WebviewValue(isInitialized: true);
-
-      _creatingCompleter.complete();
-    } on PlatformException catch (e) {
-      _creatingCompleter.completeError(e);
-    }
-
-    return _creatingCompleter.future;
+      throw MissingPluginException('Unknown method ${call.method}');
+    });
   }
 
   @internal
@@ -418,17 +348,12 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     return null;
   }
 
-  @override
   Future<void> dispose() async {
-    await _creatingCompleter.future;
-
     if (!_isDisposed) {
       _isDisposed = true;
       await _eventStreamSubscription?.cancel();
       await _pluginChannel.invokeMethod('dispose', _textureId);
     }
-
-    super.dispose();
   }
 
   /// Loads the given [url].
@@ -440,8 +365,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('loadUrl', {
       'url': url,
@@ -455,8 +378,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('loadStringContent', content);
   }
 
@@ -465,8 +386,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('reload');
   }
@@ -477,8 +396,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('stop');
   }
 
@@ -488,8 +405,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('goBack');
   }
 
@@ -498,8 +413,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('goForward');
   }
@@ -516,8 +429,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return null;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod<String?>(
         'addScriptToExecuteOnDocumentCreated', script);
   }
@@ -529,8 +440,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return null;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod(
         'removeScriptToExecuteOnDocumentCreated', scriptId);
@@ -544,8 +453,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     final data = await _methodChannel.invokeMethod('executeScript', script);
 
@@ -562,8 +469,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('postWebMessage', message);
   }
 
@@ -572,8 +477,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('setUserAgent', userAgent);
   }
@@ -584,8 +487,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('clearCookies');
   }
 
@@ -594,8 +495,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('clearCache');
   }
@@ -606,8 +505,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('setCacheDisabled', disabled);
   }
 
@@ -616,8 +513,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('openDevTools');
   }
@@ -629,8 +524,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('setDevToolsEnabled', enabled);
   }
@@ -644,8 +537,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod(
         'setTrackingPreventionLevel', level.index);
@@ -661,8 +552,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod(
         'setBackgroundColor', color.toARGB32().toSigned(32));
   }
@@ -673,8 +562,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('setZoomFactor', zoomFactor);
   }
 
@@ -683,8 +570,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('suspend');
   }
@@ -695,8 +580,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('resume');
   }
 
@@ -706,8 +589,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod(
         'setMemoryUsageTargetLevel', level.index);
@@ -754,8 +635,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     await _methodChannel.invokeMethod(
         'setTransparencyHitTestingEnabled', enabled);
 
@@ -773,8 +652,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('setExtraHeaders', headers);
   }
@@ -794,8 +671,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel
         .invokeMethod('setDomainExtraHeaders', [domain, headers]);
   }
@@ -805,8 +680,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('setFpsLimit', maxFps);
   }
@@ -824,8 +697,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('setPointerUpdate',
         [pointer, kind.index, position.dx, position.dy, size, pressure]);
   }
@@ -836,8 +707,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel
         .invokeMethod('setCursorPos', [position.dx, position.dy]);
@@ -850,8 +719,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('setPointerButton',
         <String, dynamic>{'button': button.index, 'isDown': isDown});
   }
@@ -863,8 +730,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
       return;
     }
 
-    assert(value.isInitialized);
-
     return _methodChannel.invokeMethod('setScrollDelta', [dx, dy]);
   }
 
@@ -874,8 +739,6 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     if (_isDisposed) {
       return;
     }
-
-    assert(value.isInitialized);
 
     return _methodChannel
         .invokeMethod('setSize', [size.width, size.height, scaleFactor]);

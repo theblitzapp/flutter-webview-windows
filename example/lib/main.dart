@@ -29,7 +29,8 @@ class ExampleBrowser extends StatefulWidget {
 }
 
 class _ExampleBrowser extends State<ExampleBrowser> {
-  final _controller = WebviewController();
+  WebviewHost? _host;
+  WebviewController? _controller;
   final _textController = TextEditingController();
   bool _isWebviewSuspended = false;
 
@@ -40,49 +41,46 @@ class _ExampleBrowser extends State<ExampleBrowser> {
   }
 
   Future<void> initPlatformState() async {
-    // Optionally initialize the webview environment using
-    // a custom user data directory
-    // and/or a custom browser executable directory
-    // and/or custom chromium command line flags
-    //await WebviewController.initializeEnvironment(
-    //    additionalArguments: '--show-fps-counter');
-
     try {
-      await _controller.initialize();
+      // Create an isolated WebView2 environment
+      final host = await WebviewHost.create(
+          // additionalArguments: '--show-fps-counter',
+          );
 
-      await _controller
+      final controller = await WebviewController.create(host);
+
+      await controller
           .setMemoryUsageTargetLevel(WebviewMemoryUsageTargetLevel.low);
 
       Timer.periodic(Duration(seconds: 10), (_) async {
-        print(
-            'webview process ids: ${await WebviewController.getProcessIds()}');
+        print('webview process ids: ${await host.getProcessIds()}');
       });
 
-      _controller.onLoadError.listen(print);
-      _controller.loadingState.addListener(() {
-        print('Loading state: ${_controller.loadingState.value}');
+      controller.onLoadError.listen(print);
+      controller.loadingState.addListener(() {
+        print('Loading state: ${controller.loadingState.value}');
       });
 
-      _controller.url.addListener(_onUrlChanged);
-      _controller.containsFullScreenElement
+      controller.url.addListener(_onUrlChanged);
+      controller.containsFullScreenElement
           .addListener(_onContainsFullScreenElementChanged);
 
-      await _controller.setBackgroundColor(Colors.transparent);
+      await controller.setBackgroundColor(Colors.transparent);
 
-      _controller.setNewWindowRequestedDelegate((url, isUserInitiated) async {
+      controller.setNewWindowRequestedDelegate((url, isUserInitiated) async {
         print('New window requested: $url, isUserInitiated: $isUserInitiated');
 
         return NewWindowDecision.deny;
       });
 
-      _controller.setNavigationStartingDelegate(
+      controller.setNavigationStartingDelegate(
           (url, isUserInitiated, isRedirected) async {
         print('Navigation starting: $url, $isUserInitiated, $isRedirected');
 
         if (url.contains('test.local')) {
-          await _controller.setTransparencyHitTestingEnabled(true);
+          await controller.setTransparencyHitTestingEnabled(true);
         } else {
-          await _controller.setTransparencyHitTestingEnabled(false);
+          await controller.setTransparencyHitTestingEnabled(false);
         }
 
         return NavigationDecision.navigate;
@@ -90,23 +88,32 @@ class _ExampleBrowser extends State<ExampleBrowser> {
 
       final testAssetsPath = p.join(
           Directory(Platform.resolvedExecutable).parent.path, 'test_assets');
-      await _controller.addVirtualHostNameMapping(
+      await controller.addVirtualHostNameMapping(
         'test.local',
         testAssetsPath,
         WebviewHostResourceAccessKind.allow,
       );
 
-      await _controller.setDomainExtraHeaders('*://flutter.dev/*', {
+      await controller.setDomainExtraHeaders('*://flutter.dev/*', {
         // 'Accept-Language': 'flutter',
         'X-Custom-Header1': 'example-value',
       });
 
-      await _controller.loadUrl('https://flutter.dev', headers: {
+      await controller.loadUrl('https://flutter.dev', headers: {
         'X-Custom-Header2': 'example-value',
       });
 
-      if (!mounted) return;
-      setState(() {});
+      if (!mounted) {
+        await controller.dispose();
+        await host.dispose();
+
+        return;
+      }
+
+      setState(() {
+        _host = host;
+        _controller = controller;
+      });
     } on PlatformException catch (e) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         showDialog(
@@ -135,16 +142,18 @@ class _ExampleBrowser extends State<ExampleBrowser> {
   }
 
   void _onUrlChanged() {
-    _textController.text = _controller.url.value ?? '';
+    _textController.text = _controller?.url.value ?? '';
   }
 
   void _onContainsFullScreenElementChanged() {
     debugPrint(
-        'Contains fullscreen element: ${_controller.containsFullScreenElement.value}');
+        'Contains fullscreen element: ${_controller?.containsFullScreenElement.value}');
   }
 
   Widget compositeView() {
-    if (!_controller.value.isInitialized) {
+    final controller = _controller;
+
+    if (controller == null) {
       return const Text(
         'Not Initialized',
         style: TextStyle(
@@ -169,7 +178,7 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                     textAlignVertical: TextAlignVertical.center,
                     controller: _textController,
                     onSubmitted: (val) {
-                      _controller.loadUrl(val);
+                      controller.loadUrl(val);
                     },
                   ),
                 ),
@@ -177,7 +186,7 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                   icon: Icon(Icons.refresh),
                   splashRadius: 20,
                   onPressed: () {
-                    _controller.reload();
+                    controller.reload();
                   },
                 ),
                 IconButton(
@@ -185,7 +194,7 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                   tooltip: 'Open DevTools',
                   splashRadius: 20,
                   onPressed: () {
-                    _controller.openDevTools();
+                    controller.openDevTools();
                   },
                 )
               ]),
@@ -199,7 +208,7 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                   children: [
                     _buildFlutterContentBehindWebview(),
                     Webview(
-                      controller: _controller,
+                      controller: controller,
                       permissionRequested: _onPermissionRequested,
                     ),
                     Positioned(
@@ -213,14 +222,14 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                           child: Padding(
                             padding: EdgeInsets.all(8),
                             child: WebviewSubregion(
-                              controller: _controller,
+                              controller: controller,
                               subregion: Rect.fromLTWH(20, 80, 100, 100),
                               borderRadius: BorderRadius.circular(8),
                             ),
                           )),
                     ),
                     ValueListenableBuilder<LoadingState>(
-                      valueListenable: _controller.loadingState,
+                      valueListenable: controller.loadingState,
                       builder: (context, loadingState, _child) {
                         if (loadingState == LoadingState.loading) {
                           return LinearProgressIndicator();
@@ -272,10 +281,16 @@ class _ExampleBrowser extends State<ExampleBrowser> {
       floatingActionButton: FloatingActionButton(
         tooltip: _isWebviewSuspended ? 'Resume webview' : 'Suspend webview',
         onPressed: () async {
+          final controller = _controller;
+
+          if (controller == null) {
+            return;
+          }
+
           if (_isWebviewSuspended) {
-            await _controller.resume();
+            await controller.resume();
           } else {
-            await _controller.suspend();
+            await controller.suspend();
           }
           setState(() {
             _isWebviewSuspended = !_isWebviewSuspended;
@@ -284,12 +299,14 @@ class _ExampleBrowser extends State<ExampleBrowser> {
         child: Icon(_isWebviewSuspended ? Icons.play_arrow : Icons.pause),
       ),
       appBar: AppBar(
-          title: ValueListenableBuilder<String?>(
-        valueListenable: _controller.title,
-        builder: (context, title, _child) {
-          return Text(title ?? 'WebView (Windows) Example');
-        },
-      )),
+          title: _controller != null
+              ? ValueListenableBuilder<String?>(
+                  valueListenable: _controller!.title,
+                  builder: (context, title, _child) {
+                    return Text(title ?? 'WebView (Windows) Example');
+                  },
+                )
+              : const Text('WebView (Windows) Example')),
       body: Center(
         child: compositeView(),
       ),
@@ -323,11 +340,12 @@ class _ExampleBrowser extends State<ExampleBrowser> {
 
   @override
   void dispose() {
-    _controller.url.removeListener(_onUrlChanged);
-    _controller.containsFullScreenElement
+    _controller?.url.removeListener(_onUrlChanged);
+    _controller?.containsFullScreenElement
         .removeListener(_onContainsFullScreenElementChanged);
 
-    _controller.dispose();
+    _controller?.dispose();
+    _host?.dispose();
 
     super.dispose();
   }

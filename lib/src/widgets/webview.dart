@@ -46,8 +46,6 @@ class _WebviewState extends State<Webview> {
 
   WebviewController get _controller => widget.controller;
 
-  int _updateSizeRequestId = 0;
-
   void _onPointerHover(PointerHoverEvent ev) {
     // ev.kind is for whatever reason not set to touch
     // even on touch input
@@ -157,12 +155,10 @@ class _WebviewState extends State<Webview> {
 
   @override
   Widget build(BuildContext context) {
-    final Widget? child;
-
-    if (!widget.controller.value.isInitialized) {
-      child = null;
-    } else {
-      child = Listener(
+    return SizedBox(
+      width: widget.width ?? double.infinity,
+      height: widget.height ?? double.infinity,
+      child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerHover: _onPointerHover,
         onPointerDown: _onPointerDown,
@@ -178,38 +174,12 @@ class _WebviewState extends State<Webview> {
           opaqueListenable: widget.controller.isPointerOverOpaqueContent,
           onSizeChanged: _updateSurfaceSize,
         ),
-      );
-    }
-
-    return SizedBox(
-      width: widget.width ?? double.infinity,
-      height: widget.height ?? double.infinity,
-      child: child,
+      ),
     );
   }
 
   void _updateSurfaceSize(Size size) {
-    _updateSizeRequestId++;
-
-    final controller = widget.controller;
-
-    if (!controller.value.isInitialized) {
-      final requestId = _updateSizeRequestId;
-
-      controller.ready.then((_) {
-        if (!mounted) {
-          return;
-        }
-
-        if (requestId != _updateSizeRequestId) {
-          return;
-        }
-
-        _updateSurfaceSize(size);
-      });
-    }
-
-    controller.setSize(
+    widget.controller.setSize(
       size,
       widget.scaleFactor ?? window.devicePixelRatio,
     );
