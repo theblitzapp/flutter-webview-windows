@@ -194,6 +194,27 @@ class Webview {
   bool SetMemoryUsageTargetLevel(int level);
   bool SetMuted(bool muted);
 
+  // ICoreWebView2Settings v1
+  bool SetScriptEnabled(bool enabled);
+  bool SetScriptDialogsEnabled(bool enabled);
+  bool SetBuiltInErrorPageEnabled(bool enabled);
+  bool SetZoomControlEnabled(bool enabled);
+  // ICoreWebView2Settings3
+  bool SetBrowserAcceleratorKeysEnabled(bool enabled);
+  // ICoreWebView2Settings4
+  bool SetGeneralAutofillEnabled(bool enabled);
+  bool SetPasswordAutosaveEnabled(bool enabled);
+  // ICoreWebView2Settings5
+  bool SetPinchZoomEnabled(bool enabled);
+  // ICoreWebView2Settings6
+  bool SetSwipeNavigationEnabled(bool enabled);
+  // ICoreWebView2Settings8
+  bool SetReputationCheckingEnabled(bool enabled);
+
+  void CallDevToolsProtocolMethod(
+      const std::string& method, const std::string& parameters,
+      std::function<void(bool, const std::string&)> callback);
+
   bool SetVirtualHostNameMapping(const std::string& hostName,
                                  const std::string& path,
                                  WebviewHostResourceAccessKind accessKind);
@@ -278,6 +299,11 @@ class Webview {
       devtools_protocol_event_receiver_;
   wil::com_ptr<ICoreWebView2Settings> settings_;
   wil::com_ptr<ICoreWebView2Settings2> settings2_;
+  wil::com_ptr<ICoreWebView2Settings3> settings3_;
+  wil::com_ptr<ICoreWebView2Settings4> settings4_;
+  wil::com_ptr<ICoreWebView2Settings5> settings5_;
+  wil::com_ptr<ICoreWebView2Settings6> settings6_;
+  wil::com_ptr<ICoreWebView2Settings8> settings8_;
   POINT last_cursor_pos_ = {0, 0};
   VirtualKeyState virtual_keys_;
 

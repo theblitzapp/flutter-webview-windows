@@ -44,13 +44,21 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     try {
       // Create an isolated WebView2 environment
       final host = await WebviewHost.create(
-          // additionalArguments: '--show-fps-counter',
-          );
+        // additionalArguments: '--show-fps-counter',
+        areBrowserExtensionsEnabled: false,
+        enableTrackingPrevention: true,
+      );
 
       final controller = await WebviewController.create(host);
 
       await controller
           .setMemoryUsageTargetLevel(WebviewMemoryUsageTargetLevel.low);
+
+      // Disable features not needed in a kiosk/embedded scenario
+      await controller.setGeneralAutofillEnabled(false);
+      await controller.setPasswordAutosaveEnabled(false);
+      await controller.setBrowserAcceleratorKeysEnabled(false);
+      await controller.setSwipeNavigationEnabled(false);
 
       Timer.periodic(Duration(seconds: 10), (_) async {
         print('webview process ids: ${await host.getProcessIds()}');
@@ -196,7 +204,13 @@ class _ExampleBrowser extends State<ExampleBrowser> {
                   onPressed: () {
                     controller.openDevTools();
                   },
-                )
+                ),
+                IconButton(
+                  icon: Icon(Icons.memory),
+                  tooltip: 'Force GC',
+                  splashRadius: 20,
+                  onPressed: () => _forceGc(controller),
+                ),
               ]),
             ),
             Expanded(
@@ -336,6 +350,13 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     );
 
     return decision ?? WebviewPermissionDecision.none;
+  }
+
+  Future<void> _forceGc(WebviewController controller) async {
+    await controller.callDevToolsProtocolMethod('HeapProfiler.collectGarbage');
+    await controller
+        .callDevToolsProtocolMethod('Memory.forciblyPurgeJavaScriptMemory');
+    debugPrint('Force GC complete');
   }
 
   @override

@@ -77,6 +77,11 @@ Webview::Webview(
 
   if (SUCCEEDED(webview_->get_Settings(settings_.put()))) {
     settings2_ = settings_.try_query<ICoreWebView2Settings2>();
+    settings3_ = settings_.try_query<ICoreWebView2Settings3>();
+    settings4_ = settings_.try_query<ICoreWebView2Settings4>();
+    settings5_ = settings_.try_query<ICoreWebView2Settings5>();
+    settings6_ = settings_.try_query<ICoreWebView2Settings6>();
+    settings8_ = settings_.try_query<ICoreWebView2Settings8>();
 
     settings_->put_IsStatusBarEnabled(FALSE);
     settings_->put_AreDefaultContextMenusEnabled(FALSE);
@@ -112,9 +117,10 @@ bool Webview::CreateSurface(
   surface_ = root.try_as<ABI::Windows::UI::Composition::IVisual>();
   assert(surface_);
 
-  // initial size. doesn't matter as we resize the surface anyway.
-  surface_->put_Size({1280, 720});
-  surface_->put_IsVisible(true);
+  // Start invisible at zero size. It's made visible on the first SetSurfaceSize
+  // call, which happens when the Flutter Webview widget is first laid out.
+  surface_->put_Size({0, 0});
+  surface_->put_IsVisible(false);
 
   // Create on-screen window for debugging purposes
   if (!offscreen_only) {
@@ -573,6 +579,7 @@ void Webview::SetSurfaceSize(size_t width, size_t height, float scale_factor) {
     bounds.bottom = kBoundsOffset + static_cast<LONG>(scaled_height);
 
     surface_->put_Size({scaled_width, scaled_height});
+    surface_->put_IsVisible(true);
     webview_controller_->put_RasterizationScale(scale_factor);
     if (webview_controller_->put_Bounds(bounds) != S_OK) {
       std::cerr << "Setting webview bounds failed." << std::endl;
@@ -595,6 +602,84 @@ bool Webview::OpenDevTools() {
 bool Webview::SetDevToolsEnabled(bool enabled) {
   if (!settings_) return false;
   return SUCCEEDED(settings_->put_AreDevToolsEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetScriptEnabled(bool enabled) {
+  if (!settings_) return false;
+  return SUCCEEDED(settings_->put_IsScriptEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetScriptDialogsEnabled(bool enabled) {
+  if (!settings_) return false;
+  return SUCCEEDED(
+      settings_->put_AreDefaultScriptDialogsEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetBuiltInErrorPageEnabled(bool enabled) {
+  if (!settings_) return false;
+  return SUCCEEDED(
+      settings_->put_IsBuiltInErrorPageEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetZoomControlEnabled(bool enabled) {
+  if (!settings_) return false;
+  return SUCCEEDED(settings_->put_IsZoomControlEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetBrowserAcceleratorKeysEnabled(bool enabled) {
+  if (!settings3_) return false;
+  return SUCCEEDED(
+      settings3_->put_AreBrowserAcceleratorKeysEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetGeneralAutofillEnabled(bool enabled) {
+  if (!settings4_) return false;
+  return SUCCEEDED(
+      settings4_->put_IsGeneralAutofillEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetPasswordAutosaveEnabled(bool enabled) {
+  if (!settings4_) return false;
+  return SUCCEEDED(
+      settings4_->put_IsPasswordAutosaveEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetPinchZoomEnabled(bool enabled) {
+  if (!settings5_) return false;
+  return SUCCEEDED(settings5_->put_IsPinchZoomEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetSwipeNavigationEnabled(bool enabled) {
+  if (!settings6_) return false;
+  return SUCCEEDED(
+      settings6_->put_IsSwipeNavigationEnabled(enabled ? TRUE : FALSE));
+}
+
+bool Webview::SetReputationCheckingEnabled(bool enabled) {
+  if (!settings8_) return false;
+  return SUCCEEDED(
+      settings8_->put_IsReputationCheckingRequired(enabled ? TRUE : FALSE));
+}
+
+void Webview::CallDevToolsProtocolMethod(
+    const std::string& method, const std::string& parameters,
+    std::function<void(bool, const std::string&)> callback) {
+  if (IsValid()) {
+    if (SUCCEEDED(webview_->CallDevToolsProtocolMethod(
+            util::Utf16FromUtf8(method).c_str(),
+            util::Utf16FromUtf8(parameters).c_str(),
+            Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
+                [callback](HRESULT result, LPCWSTR return_object) {
+                  callback(SUCCEEDED(result),
+                           return_object ? util::Utf8FromUtf16(return_object)
+                                         : std::string());
+                  return S_OK;
+                })
+                .Get()))) {
+      return;
+    }
+  }
+  callback(false, std::string());
 }
 
 bool Webview::SetTrackingPreventionLevel(int level) {
@@ -994,9 +1079,8 @@ bool Webview::SetMemoryUsageTargetLevel(int level) {
     return false;
   }
 
-  auto target = (level == 0)
-      ? COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
-      : COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW;
+  auto target = (level == 0) ? COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+                             : COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW;
   return SUCCEEDED(webview19->put_MemoryUsageTargetLevel(target));
 }
 

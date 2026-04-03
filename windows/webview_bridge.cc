@@ -49,6 +49,19 @@ constexpr auto kMethodSetTransparencyHitTestingEnabled =
     "setTransparencyHitTestingEnabled";
 constexpr auto kMethodSetExtraHeaders = "setExtraHeaders";
 constexpr auto kMethodSetDomainExtraHeaders = "setDomainExtraHeaders";
+constexpr auto kMethodSetScriptEnabled = "setScriptEnabled";
+constexpr auto kMethodSetScriptDialogsEnabled = "setScriptDialogsEnabled";
+constexpr auto kMethodSetBuiltInErrorPageEnabled = "setBuiltInErrorPageEnabled";
+constexpr auto kMethodSetZoomControlEnabled = "setZoomControlEnabled";
+constexpr auto kMethodSetBrowserAcceleratorKeysEnabled =
+    "setBrowserAcceleratorKeysEnabled";
+constexpr auto kMethodSetGeneralAutofillEnabled = "setGeneralAutofillEnabled";
+constexpr auto kMethodSetPasswordAutosaveEnabled = "setPasswordAutosaveEnabled";
+constexpr auto kMethodSetPinchZoomEnabled = "setPinchZoomEnabled";
+constexpr auto kMethodSetSwipeNavigationEnabled = "setSwipeNavigationEnabled";
+constexpr auto kMethodSetReputationCheckingEnabled =
+    "setReputationCheckingEnabled";
+constexpr auto kMethodCallDevToolsProtocolMethod = "callDevToolsProtocolMethod";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -909,6 +922,150 @@ void WebviewBridge::HandleMethodCall(
       }
 
       return result->Success();
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setScriptEnabled: bool
+  if (method_name.compare(kMethodSetScriptEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetScriptEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed, "Setting script enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setScriptDialogsEnabled: bool
+  if (method_name.compare(kMethodSetScriptDialogsEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetScriptDialogsEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting script dialogs enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setBuiltInErrorPageEnabled: bool
+  if (method_name.compare(kMethodSetBuiltInErrorPageEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetBuiltInErrorPageEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting built-in error page enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setZoomControlEnabled: bool
+  if (method_name.compare(kMethodSetZoomControlEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetZoomControlEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting zoom control enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setBrowserAcceleratorKeysEnabled: bool
+  if (method_name.compare(kMethodSetBrowserAcceleratorKeysEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetBrowserAcceleratorKeysEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting browser accelerator keys enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setGeneralAutofillEnabled: bool
+  if (method_name.compare(kMethodSetGeneralAutofillEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetGeneralAutofillEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting general autofill enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setPasswordAutosaveEnabled: bool
+  if (method_name.compare(kMethodSetPasswordAutosaveEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetPasswordAutosaveEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting password autosave enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setPinchZoomEnabled: bool
+  if (method_name.compare(kMethodSetPinchZoomEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetPinchZoomEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed, "Setting pinch zoom enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setSwipeNavigationEnabled: bool
+  if (method_name.compare(kMethodSetSwipeNavigationEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetSwipeNavigationEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting swipe navigation enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // setReputationCheckingEnabled: bool
+  if (method_name.compare(kMethodSetReputationCheckingEnabled) == 0) {
+    if (const auto enabled = std::get_if<bool>(method_call.arguments())) {
+      if (webview_->SetReputationCheckingEnabled(*enabled)) {
+        return result->Success();
+      }
+      return result->Error(kMethodFailed,
+                           "Setting reputation checking enabled failed.");
+    }
+    return result->Error(kErrorInvalidArgs);
+  }
+
+  // callDevToolsProtocolMethod: [method, parameters]
+  if (method_name.compare(kMethodCallDevToolsProtocolMethod) == 0) {
+    if (const auto* list =
+            std::get_if<flutter::EncodableList>(method_call.arguments())) {
+      if (list->size() == 2) {
+        const auto* method_str = std::get_if<std::string>(&(*list)[0]);
+        const auto* params_str = std::get_if<std::string>(&(*list)[1]);
+        if (method_str && params_str) {
+          std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
+              shared_result = std::move(result);
+          webview_->CallDevToolsProtocolMethod(
+              *method_str, *params_str,
+              [shared_result](bool success, const std::string& json_result) {
+                if (success) {
+                  shared_result->Success(flutter::EncodableValue(json_result));
+                } else {
+                  shared_result->Error(kMethodFailed, "CDP method failed.");
+                }
+              });
+          return;
+        }
+      }
     }
     return result->Error(kErrorInvalidArgs);
   }

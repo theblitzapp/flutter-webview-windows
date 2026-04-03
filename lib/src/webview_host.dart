@@ -25,10 +25,16 @@ class WebviewHost {
   /// - [browserExePath]: Path to a fixed-version WebView2 runtime executable.
   ///   When omitted, the system-installed WebView2 runtime is used.
   /// - [additionalArguments]: Extra Chromium command-line arguments.
+  /// - [areBrowserExtensionsEnabled]: Whether browser extensions are enabled.
+  ///   Requires WebView2 EnvironmentOptions v8.
+  /// - [enableTrackingPrevention]: Whether tracking prevention is enabled.
+  ///   Requires WebView2 EnvironmentOptions v4.
   static Future<WebviewHost> create({
     String? userDataPath,
     String? browserExePath,
     String? additionalArguments,
+    bool? areBrowserExtensionsEnabled,
+    bool? enableTrackingPrevention,
   }) async {
     // In debug mode, clear any hosts and webviews left over from a previous
     // hot restart before creating a new host.
@@ -43,6 +49,8 @@ class WebviewHost {
         'userDataPath': userDataPath,
         'browserExePath': browserExePath,
         'additionalArguments': additionalArguments,
+        'areBrowserExtensionsEnabled': areBrowserExtensionsEnabled,
+        'enableTrackingPrevention': enableTrackingPrevention,
       },
     );
 

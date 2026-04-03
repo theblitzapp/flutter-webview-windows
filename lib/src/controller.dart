@@ -528,6 +528,92 @@ class WebviewController {
     return _methodChannel.invokeMethod('setDevToolsEnabled', enabled);
   }
 
+  /// Controls whether JavaScript execution is enabled.
+  Future<void> setScriptEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setScriptEnabled', enabled);
+  }
+
+  /// Controls whether native JavaScript dialogs (alert, confirm, prompt) are shown.
+  Future<void> setScriptDialogsEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setScriptDialogsEnabled', enabled);
+  }
+
+  /// Controls whether the built-in error page is shown on navigation failures.
+  Future<void> setBuiltInErrorPageEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setBuiltInErrorPageEnabled', enabled);
+  }
+
+  /// Controls whether the browser's zoom controls (pinch-to-zoom on touch,
+  /// ctrl+scroll on desktop) are enabled.
+  Future<void> setZoomControlEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setZoomControlEnabled', enabled);
+  }
+
+  /// Controls whether browser-specific accelerator keys (e.g. F5, Ctrl+P) are
+  /// handled by the WebView.
+  Future<void> setBrowserAcceleratorKeysEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod(
+        'setBrowserAcceleratorKeysEnabled', enabled);
+  }
+
+  /// Controls whether the browser's general autofill feature is enabled.
+  Future<void> setGeneralAutofillEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setGeneralAutofillEnabled', enabled);
+  }
+
+  /// Controls whether the browser's password autosave feature is enabled.
+  Future<void> setPasswordAutosaveEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setPasswordAutosaveEnabled', enabled);
+  }
+
+  /// Controls whether pinch-to-zoom is enabled on touch screens.
+  Future<void> setPinchZoomEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setPinchZoomEnabled', enabled);
+  }
+
+  /// Controls whether swiping left/right to navigate back/forward is enabled.
+  Future<void> setSwipeNavigationEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setSwipeNavigationEnabled', enabled);
+  }
+
+  /// Controls whether SmartScreen reputation checking is enabled.
+  Future<void> setReputationCheckingEnabled(bool enabled) async {
+    if (_isDisposed) return;
+    return _methodChannel.invokeMethod('setReputationCheckingEnabled', enabled);
+  }
+
+  /// Calls a DevTools Protocol (CDP) method and returns the JSON result string.
+  ///
+  /// [method] is the CDP method name (e.g. `'HeapProfiler.collectGarbage'`).
+  /// [parameters] is a JSON string of method parameters (defaults to `'{}'`).
+  ///
+  /// Returns the raw CDP JSON response string, or `null` if this controller
+  /// has been disposed.
+  ///
+  /// Example — force JavaScript garbage collection:
+  /// ```dart
+  /// await controller.callDevToolsProtocolMethod('HeapProfiler.collectGarbage');
+  /// ```
+  Future<String?> callDevToolsProtocolMethod(
+    String method, [
+    String parameters = '{}',
+  ]) async {
+    if (_isDisposed) return null;
+    return _methodChannel.invokeMethod<String>(
+      'callDevToolsProtocolMethod',
+      [method, parameters],
+    );
+  }
+
   /// Sets the tracking prevention level.
   ///
   /// See [WebviewTrackingPreventionLevel] for available levels.

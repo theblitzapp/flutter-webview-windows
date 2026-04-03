@@ -281,8 +281,14 @@ void WebviewWindowsPlugin::HandleCreateHost(
   auto additional_args =
       GetOptionalValue<std::string>(args, "additionalArguments");
 
-  auto host = WebviewHost::Create(platform_.get(), user_data_wpath,
-                                  browser_exe_wpath, additional_args);
+  auto extensions_enabled =
+      GetOptionalValue<bool>(args, "areBrowserExtensionsEnabled");
+  auto tracking_prevention_enabled =
+      GetOptionalValue<bool>(args, "enableTrackingPrevention");
+
+  auto host = WebviewHost::Create(
+      platform_.get(), user_data_wpath, browser_exe_wpath, additional_args,
+      extensions_enabled, tracking_prevention_enabled);
   if (!host) {
     return result->Error(kErrorCodeEnvironmentCreationFailed,
                          "Failed to create WebView2 environment");
