@@ -202,8 +202,6 @@ WebviewBridge::~WebviewBridge() {
     texture_bridge_->Stop();
   }
 
-  method_channel_->SetMethodCallHandler(nullptr);
-
   texture_registrar_->UnregisterTexture(texture_id_);
 }
 
@@ -558,7 +556,8 @@ void WebviewBridge::HandleMethodCall(
     return result->Error(kErrorInvalidArgs);
   }
 
-  // loadUrl: map with "url" (string) and optional "headers" (map<string,string>)
+  // loadUrl: map with "url" (string) and optional "headers"
+  // (map<string,string>)
   if (method_name.compare(kMethodLoadUrl) == 0) {
     if (const auto args =
             std::get_if<flutter::EncodableMap>(method_call.arguments())) {
