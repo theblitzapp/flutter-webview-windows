@@ -75,6 +75,13 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     return _pluginChannel.invokeMethod<String>('getWebViewVersion');
   }
 
+  /// Returns the OS process IDs for all processes associated with the
+  /// WebView2 environment.
+  static Future<List<int>> getProcessIds() async {
+    final result = await _pluginChannel.invokeListMethod<int>('getProcessIds');
+    return result ?? const [];
+  }
+
   static bool _staleInstancesCleared = false;
 
   WebviewController() : super(WebviewValue.uninitialized());

@@ -24,6 +24,7 @@ constexpr auto kMethodDispose = "dispose";
 constexpr auto kMethodDisposeAll = "disposeAll";
 constexpr auto kMethodInitializeEnvironment = "initializeEnvironment";
 constexpr auto kMethodGetWebViewVersion = "getWebViewVersion";
+constexpr auto kMethodGetProcessIds = "getProcessIds";
 
 constexpr auto kErrorCodeInvalidId = "invalid_id";
 constexpr auto kErrorCodeEnvironmentCreationFailed =
@@ -160,6 +161,59 @@ void WebviewWindowsPlugin::HandleMethodCall(
     } else {
       return result->Success();
     }
+  }
+
+  if (method_call.method_name().compare(kMethodGetProcessIds) == 0) {
+    if (!webview_host_) {
+      return result->Error(kErrorCodeEnvironmentCreationFailed,
+                           "The webview environment is not initialized");
+    }
+
+    auto env13 =
+        webview_host_->environment().try_query<ICoreWebView2Environment13>();
+    if (!env13) {
+      return result->Error("not_supported",
+                           "ICoreWebView2Environment13 is not available");
+    }
+
+    std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
+        shared_result = std::move(result);
+    env13->GetProcessExtendedInfos(
+        Microsoft::WRL::Callback<
+            ICoreWebView2GetProcessExtendedInfosCompletedHandler>(
+            [shared_result](HRESULT error,
+                            ICoreWebView2ProcessExtendedInfoCollection*
+                                collection) -> HRESULT {
+              if (FAILED(error) || !collection) {
+                shared_result->Error("process_info_failed",
+                                     "GetProcessExtendedInfos failed");
+                return S_OK;
+              }
+
+              UINT32 count = 0;
+              collection->get_Count(&count);
+
+              flutter::EncodableList pids;
+              pids.reserve(count);
+
+              for (UINT32 i = 0; i < count; i++) {
+                wil::com_ptr<ICoreWebView2ProcessExtendedInfo> extended;
+                if (FAILED(collection->GetValueAtIndex(i, &extended))) continue;
+
+                wil::com_ptr<ICoreWebView2ProcessInfo> info;
+                if (FAILED(extended->get_ProcessInfo(&info))) continue;
+
+                INT32 pid = 0;
+                if (SUCCEEDED(info->get_ProcessId(&pid)) && pid != 0) {
+                  pids.push_back(flutter::EncodableValue(pid));
+                }
+              }
+
+              shared_result->Success(flutter::EncodableValue(std::move(pids)));
+              return S_OK;
+            })
+            .Get());
+    return;
   }
 
   if (method_call.method_name().compare(kMethodInitialize) == 0) {

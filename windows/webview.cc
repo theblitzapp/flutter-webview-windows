@@ -1062,9 +1062,8 @@ void Webview::EnsureExtraHeadersFilterRegistered() {
 
             for (const auto& [filter, headers] : domain_extra_headers_) {
               for (const auto& [key, value] : headers) {
-                request_headers->SetHeader(
-                    util::Utf16FromUtf8(key).c_str(),
-                    util::Utf16FromUtf8(value).c_str());
+                request_headers->SetHeader(util::Utf16FromUtf8(key).c_str(),
+                                           util::Utf16FromUtf8(value).c_str());
               }
             }
 
@@ -1110,8 +1109,8 @@ void Webview::SetDomainExtraHeaders(
           wdomain.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
     }
   } else {
-    bool is_new = domain_extra_headers_.find(domain) ==
-                  domain_extra_headers_.end();
+    bool is_new =
+        domain_extra_headers_.find(domain) == domain_extra_headers_.end();
     domain_extra_headers_[domain] = headers;
 
     if (is_new) {

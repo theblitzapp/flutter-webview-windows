@@ -50,6 +50,11 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     try {
       await _controller.initialize();
 
+      Timer.periodic(Duration(seconds: 10), (_) async {
+        print(
+            'webview process ids: ${await WebviewController.getProcessIds()}');
+      });
+
       _controller.onLoadError.listen(print);
       _controller.loadingState.addListener(() {
         print('Loading state: ${_controller.loadingState.value}');
