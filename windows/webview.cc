@@ -984,6 +984,22 @@ bool Webview::Resume() {
          webview_controller_->put_IsVisible(true) == S_OK;
 }
 
+bool Webview::SetMemoryUsageTargetLevel(int level) {
+  if (!IsValid()) {
+    return false;
+  }
+
+  auto webview19 = webview_.try_query<ICoreWebView2_19>();
+  if (!webview19) {
+    return false;
+  }
+
+  auto target = (level == 0)
+      ? COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+      : COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW;
+  return SUCCEEDED(webview19->put_MemoryUsageTargetLevel(target));
+}
+
 bool Webview::SetMuted(bool muted) {
   if (!IsValid()) {
     return false;

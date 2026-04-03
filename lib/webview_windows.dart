@@ -4,6 +4,7 @@ export 'src/models/download_event.dart';
 export 'src/models/error_status.dart';
 export 'src/models/history_changed.dart';
 export 'src/models/loading_state.dart';
+export 'src/models/memory_usage_target_level.dart';
 export 'src/models/navigation.dart';
 export 'src/models/permissions.dart';
 export 'src/models/pointer.dart';

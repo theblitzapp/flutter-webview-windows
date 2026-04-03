@@ -50,6 +50,9 @@ class _ExampleBrowser extends State<ExampleBrowser> {
     try {
       await _controller.initialize();
 
+      await _controller
+          .setMemoryUsageTargetLevel(WebviewMemoryUsageTargetLevel.low);
+
       Timer.periodic(Duration(seconds: 10), (_) async {
         print(
             'webview process ids: ${await WebviewController.getProcessIds()}');

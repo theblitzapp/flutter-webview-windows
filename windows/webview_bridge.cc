@@ -34,6 +34,7 @@ constexpr auto kMethodSetZoomFactor = "setZoomFactor";
 constexpr auto kMethodOpenDevTools = "openDevTools";
 constexpr auto kMethodSuspend = "suspend";
 constexpr auto kMethodResume = "resume";
+constexpr auto kMethodSetMemoryUsageTargetLevel = "setMemoryUsageTargetLevel";
 constexpr auto kMethodSetVirtualHostNameMapping = "setVirtualHostNameMapping";
 constexpr auto kMethodClearVirtualHostNameMapping =
     "clearVirtualHostNameMapping";
@@ -636,6 +637,18 @@ void WebviewBridge::HandleMethodCall(
     webview_->Resume();
     texture_bridge_->Start();
     return result->Success();
+  }
+
+  // setMemoryUsageTargetLevel: int (0 = normal, 1 = low)
+  if (method_name.compare(kMethodSetMemoryUsageTargetLevel) == 0) {
+    if (const auto* level = std::get_if<int32_t>(method_call.arguments())) {
+      if (webview_->SetMemoryUsageTargetLevel(*level)) {
+        return result->Success();
+      }
+      return result->Error("memory_target_level_failed",
+                           "Failed to set memory usage target level");
+    }
+    return result->Error("invalid_argument", "Expected an int argument");
   }
 
   // setVirtualHostNameMapping [string hostName, string path, int accessKind]

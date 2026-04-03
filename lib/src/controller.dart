@@ -9,6 +9,7 @@ import 'package:webview_windows/src/models/download_event.dart';
 import 'package:webview_windows/src/models/error_status.dart';
 import 'package:webview_windows/src/models/history_changed.dart';
 import 'package:webview_windows/src/models/loading_state.dart';
+import 'package:webview_windows/src/models/memory_usage_target_level.dart';
 import 'package:webview_windows/src/models/navigation.dart';
 import 'package:webview_windows/src/models/permissions.dart';
 import 'package:webview_windows/src/models/popup_policy.dart';
@@ -697,6 +698,19 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     assert(value.isInitialized);
 
     return _methodChannel.invokeMethod('resume');
+  }
+
+  /// Sets the desired memory consumption level of the WebView.
+  Future<void> setMemoryUsageTargetLevel(
+      WebviewMemoryUsageTargetLevel level) async {
+    if (_isDisposed) {
+      return;
+    }
+
+    assert(value.isInitialized);
+
+    return _methodChannel.invokeMethod(
+        'setMemoryUsageTargetLevel', level.index);
   }
 
   /// Adds a Virtual Host Name Mapping.
