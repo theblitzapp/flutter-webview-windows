@@ -109,6 +109,7 @@ struct EventRegistrations {
   EventRegistrationToken download_state_changed_token_{};
   EventRegistrationToken navigation_starting_token_{};
   EventRegistrationToken web_resource_requested_token_{};
+  EventRegistrationToken process_failed_token_{};
 };
 
 class Webview {
@@ -149,6 +150,7 @@ class Webview {
   typedef std::function<void(const std::string& url, bool is_user_initiated,
                              NewWindowRequestedCompleter completer)>
       NewWindowRequestedCallback;
+  typedef std::function<void(int kind, int reason)> ProcessFailedCallback;
 
   ~Webview();
 
@@ -287,6 +289,10 @@ class Webview {
     new_window_requested_callback_ = std::move(callback);
   }
 
+  void OnProcessFailed(ProcessFailedCallback callback) {
+    process_failed_callback_ = std::move(callback);
+  }
+
  private:
   HWND hwnd_;
   bool owns_window_;
@@ -330,6 +336,7 @@ class Webview {
       contains_fullscreen_element_changed_callback_;
   NavigationStartingCallback navigation_starting_callback_;
   NewWindowRequestedCallback new_window_requested_callback_;
+  ProcessFailedCallback process_failed_callback_;
   std::optional<std::string> navigation_starting_allowed_url_;
   std::set<UINT64> intercepted_navigation_ids_;
   int navigation_intercept_id_ = 0;

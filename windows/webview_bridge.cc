@@ -368,6 +368,20 @@ void WebviewBridge::RegisterEventHandlers() {
              contains_fullscreen_element}});
         EmitEvent(event);
       });
+
+  webview_->OnProcessFailed([this](int kind, int reason) {
+    const auto event = flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue(kEventType),
+         flutter::EncodableValue("processFailed")},
+        {flutter::EncodableValue(kEventValue),
+         flutter::EncodableValue(flutter::EncodableMap{
+             {flutter::EncodableValue("kind"),
+              flutter::EncodableValue(kind)},
+             {flutter::EncodableValue("reason"),
+              flutter::EncodableValue(reason)},
+         })}});
+    EmitEvent(event);
+  });
 }
 
 void WebviewBridge::OnPermissionRequested(

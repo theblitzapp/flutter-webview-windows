@@ -11,6 +11,7 @@ import 'package:webview_windows/src/models/history_changed.dart';
 import 'package:webview_windows/src/models/loading_state.dart';
 import 'package:webview_windows/src/models/memory_usage_target_level.dart';
 import 'package:webview_windows/src/models/navigation.dart';
+import 'package:webview_windows/src/models/process_failed.dart';
 import 'package:webview_windows/src/models/permissions.dart';
 import 'package:webview_windows/src/models/popup_policy.dart';
 import 'package:webview_windows/src/models/script_id.dart';
@@ -132,6 +133,17 @@ class WebviewController {
   ValueListenable<bool> get containsFullScreenElement =>
       _containsFullScreenElementNotifier;
 
+  final StreamController<WebviewProcessFailedEvent>
+      _processFailedStreamController =
+      StreamController<WebviewProcessFailedEvent>.broadcast();
+
+  /// Fires when a WebView2 process fails (crashes, becomes unresponsive, etc).
+  ///
+  /// Listen for [WebviewProcessFailedKind.browserProcessExited] to detect
+  /// unrecoverable failures that require recreating the webview.
+  Stream<WebviewProcessFailedEvent> get onProcessFailed =>
+      _processFailedStreamController.stream;
+
   final ValueNotifier<Size> _sizeNotifier = ValueNotifier<Size>(Size.zero);
 
   /// Reflects the current size of the webview surface.
@@ -229,6 +241,21 @@ class WebviewController {
 
         case 'pointerTransparencyChanged':
           _isPointerOverOpaqueContent.value = map['value'] as bool;
+
+          break;
+
+        case 'processFailed':
+          final value = map['value'] as Map<dynamic, dynamic>;
+          final kindIndex = value['kind'] as int;
+          final reasonIndex = value['reason'] as int;
+          _processFailedStreamController.add(WebviewProcessFailedEvent(
+            kind: kindIndex < WebviewProcessFailedKind.values.length
+                ? WebviewProcessFailedKind.values[kindIndex]
+                : WebviewProcessFailedKind.unknown,
+            reason: reasonIndex < WebviewProcessFailedReason.values.length
+                ? WebviewProcessFailedReason.values[reasonIndex]
+                : WebviewProcessFailedReason.unexpected,
+          ));
 
           break;
       }
@@ -352,6 +379,11 @@ class WebviewController {
     if (!_isDisposed) {
       _isDisposed = true;
       await _eventStreamSubscription?.cancel();
+      await _onLoadErrorStreamController.close();
+      await _downloadEventStreamController.close();
+      await _webMessageStreamController.close();
+      await _processFailedStreamController.close();
+
       await _pluginChannel.invokeMethod('dispose', _textureId);
     }
   }

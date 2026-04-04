@@ -509,6 +509,31 @@ void Webview::RegisterEventHandlers() {
             .Get(),
         &event_registrations_.download_starting_token_);
   }
+
+  webview_->add_ProcessFailed(
+      Callback<ICoreWebView2ProcessFailedEventHandler>(
+          [this](ICoreWebView2* sender,
+                 ICoreWebView2ProcessFailedEventArgs* args) -> HRESULT {
+            if (process_failed_callback_) {
+              COREWEBVIEW2_PROCESS_FAILED_KIND kind;
+              args->get_ProcessFailedKind(&kind);
+
+              COREWEBVIEW2_PROCESS_FAILED_REASON reason =
+                  COREWEBVIEW2_PROCESS_FAILED_REASON_UNEXPECTED;
+              auto args2 =
+                  wil::try_com_query<ICoreWebView2ProcessFailedEventArgs2>(
+                      args);
+              if (args2) {
+                args2->get_Reason(&reason);
+              }
+
+              process_failed_callback_(static_cast<int>(kind),
+                                       static_cast<int>(reason));
+            }
+            return S_OK;
+          })
+          .Get(),
+      &event_registrations_.process_failed_token_);
 }
 
 void Webview::UnregisterEventHandlers() {
@@ -530,6 +555,9 @@ void Webview::UnregisterEventHandlers() {
         event_registrations_.new_windows_requested_token_);
     webview_->remove_ContainsFullScreenElementChanged(
         event_registrations_.contains_fullscreen_element_changed_token_);
+
+    webview_->remove_ProcessFailed(
+        event_registrations_.process_failed_token_);
 
     if (extra_headers_filter_registered_) {
       webview_->remove_WebResourceRequested(

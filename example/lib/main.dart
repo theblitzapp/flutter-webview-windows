@@ -65,6 +65,9 @@ class _ExampleBrowser extends State<ExampleBrowser> {
       });
 
       controller.onLoadError.listen(print);
+      controller.onProcessFailed.listen((event) {
+        print('Process failed: ${event.kind} (reason: ${event.reason})');
+      });
       controller.loadingState.addListener(() {
         print('Loading state: ${controller.loadingState.value}');
       });

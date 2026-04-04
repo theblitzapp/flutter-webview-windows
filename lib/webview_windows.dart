@@ -10,6 +10,7 @@ export 'src/models/navigation.dart';
 export 'src/models/permissions.dart';
 export 'src/models/pointer.dart';
 export 'src/models/popup_policy.dart';
+export 'src/models/process_failed.dart';
 export 'src/models/script_id.dart';
 export 'src/models/tracking_prevention.dart';
 export 'src/widgets/webview.dart';

@@ -189,7 +189,7 @@ void WebviewWindowsPlugin::HandleMethodCall(
 
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>
         shared_result = std::move(result);
-    env13->GetProcessExtendedInfos(
+    HRESULT hr = env13->GetProcessExtendedInfos(
         Microsoft::WRL::Callback<
             ICoreWebView2GetProcessExtendedInfosCompletedHandler>(
             [shared_result](HRESULT error,
@@ -224,6 +224,12 @@ void WebviewWindowsPlugin::HandleMethodCall(
               return S_OK;
             })
             .Get());
+
+    if (FAILED(hr)) {
+      shared_result->Error("process_info_failed",
+                           "GetProcessExtendedInfos call failed");
+    }
+
     return;
   }
 
