@@ -40,6 +40,8 @@ class Webview extends StatefulWidget {
 }
 
 class _WebviewState extends State<Webview> {
+  late double _scaleFactor;
+
   final _downButtons = <int, PointerButton>{};
 
   PointerDeviceKind _pointerKind = PointerDeviceKind.unknown;
@@ -154,6 +156,13 @@ class _WebviewState extends State<Webview> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    _scaleFactor = widget.scaleFactor ?? View.of(context).devicePixelRatio;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: widget.width ?? double.infinity,
@@ -181,7 +190,7 @@ class _WebviewState extends State<Webview> {
   void _updateSurfaceSize(Size size) {
     widget.controller.setSize(
       size,
-      widget.scaleFactor ?? window.devicePixelRatio,
+      widget.scaleFactor ?? _scaleFactor,
     );
   }
 }
