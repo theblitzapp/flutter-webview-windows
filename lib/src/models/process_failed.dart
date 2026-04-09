@@ -48,10 +48,11 @@ enum WebviewProcessFailedReason {
   /// The process failed to launch.
   launchFailed,
 
-  /// The process exited normally.
+  /// The process ran out of memory.
   outOfMemory,
 
   /// A profile was deleted while the process was still using it.
+  @Deprecated('This value is unused.')
   profileDeleted,
 }
 
