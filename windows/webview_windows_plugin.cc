@@ -84,6 +84,7 @@ class WebviewWindowsPlugin : public flutter::Plugin {
   WNDCLASS window_class_ = {};
   flutter::TextureRegistrar* textures_;
   flutter::BinaryMessenger* messenger_;
+  std::shared_ptr<bool> alive_flag_{std::make_shared<bool>(true)};
 
   bool InitPlatform();
 
@@ -131,6 +132,8 @@ WebviewWindowsPlugin::WebviewWindowsPlugin(flutter::TextureRegistrar* textures,
 
 WebviewWindowsPlugin::~WebviewWindowsPlugin() {
   instances_.clear();
+  instance_host_.clear();
+  hosts_.clear();
   UnregisterClass(window_class_.lpszClassName, nullptr);
 }
 
@@ -355,9 +358,11 @@ void WebviewWindowsPlugin::CreateWebviewInstance(
       shared_result = std::move(result);
   host_it->second->CreateWebview(
       hwnd, true, true,
-      [shared_result, host_id, this](
+      [shared_result, host_id, alive = std::weak_ptr<bool>(alive_flag_), this](
           std::unique_ptr<Webview> webview,
           std::unique_ptr<WebviewCreationError> error) {
+        if (!alive.lock()) return;
+
         if (!webview) {
           if (error) {
             return shared_result->Error(

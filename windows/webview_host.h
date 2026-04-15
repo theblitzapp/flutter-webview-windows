@@ -5,6 +5,7 @@
 #include <wil/com.h>
 
 #include <functional>
+#include <memory>
 
 #include "graphics_context.h"
 #include "webview.h"
@@ -61,6 +62,7 @@ class WebviewHost {
  private:
   winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor_;
   wil::com_ptr<ICoreWebView2Environment3> webview_env_;
+  std::shared_ptr<bool> alive_flag_{std::make_shared<bool>(true)};
 
   WebviewHost(WebviewPlatform* platform,
               wil::com_ptr<ICoreWebView2Environment3> webview_env);

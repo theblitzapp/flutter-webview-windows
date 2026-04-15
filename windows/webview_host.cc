@@ -79,9 +79,11 @@ void WebviewHost::CreateWebview(HWND hwnd, bool offscreen_only,
                                 bool owns_window,
                                 WebviewCreationCallback callback) {
   CreateWebViewCompositionController(
-      hwnd, [=, self = this](
+      hwnd, [=, self = this, alive = std::weak_ptr<bool>(alive_flag_)](
                 wil::com_ptr<ICoreWebView2CompositionController> controller,
                 std::unique_ptr<WebviewCreationError> error) {
+        if (!alive.lock()) return;
+
         if (controller) {
           std::unique_ptr<Webview> webview(new Webview(
               std::move(controller), self, hwnd, owns_window, offscreen_only));
