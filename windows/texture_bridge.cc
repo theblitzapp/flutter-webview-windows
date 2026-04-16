@@ -39,6 +39,7 @@ TextureBridge::~TextureBridge() {
   StopInternal();
   if (capture_item_) {
     capture_item_->remove_Closed(on_closed_token_);
+    capture_item_ = nullptr;
   }
 }
 
@@ -98,20 +99,48 @@ void TextureBridge::Stop() {
 }
 
 void TextureBridge::StopInternal() {
-  if (is_running_) {
-    is_running_ = false;
+  if (!is_running_) {
+    return;
+  }
+  is_running_ = false;
+
+  // Remove the FrameArrived handler first so the capture thread stops
+  // dispatching new events. Note: this does not guarantee that an already
+  // in-flight handler invocation has returned; the mutex in OnFrameArrived
+  // and the is_running_ guard together protect the remainder.
+  if (frame_pool_) {
     frame_pool_->remove_FrameArrived(on_frame_arrived_token_);
-    auto closable =
-        capture_session_.try_as<ABI::Windows::Foundation::IClosable>();
-    assert(closable);
-    closable->Close();
+  }
+  on_frame_arrived_token_ = {};
+
+  // Close the capture session before the frame pool so the pipeline drains
+  // in the correct order.
+  if (capture_session_) {
+    if (auto closable =
+            capture_session_.try_as<ABI::Windows::Foundation::IClosable>()) {
+      closable->Close();
+    }
     capture_session_ = nullptr;
   }
+
+  // Close the frame pool to release the underlying capture resources.
+  if (frame_pool_) {
+    if (auto closable =
+            frame_pool_.try_as<ABI::Windows::Foundation::IClosable>()) {
+      closable->Close();
+    }
+    frame_pool_ = nullptr;
+  }
+
+  // Null these out so any handler that already took the mutex before Stop
+  // began cannot fire the callback or touch the last frame after we return.
+  frame_available_ = nullptr;
+  last_frame_ = nullptr;
 }
 
 void TextureBridge::OnFrameArrived() {
   const std::lock_guard<std::mutex> lock(mutex_);
-  if (!is_running_) {
+  if (!is_running_ || !frame_pool_ || !capture_session_) {
     return;
   }
 

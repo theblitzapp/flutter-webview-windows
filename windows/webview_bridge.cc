@@ -174,8 +174,14 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
           }));
 
   texture_id_ = texture_registrar->RegisterTexture(flutter_texture_.get());
+  // Capture texture_registrar_ and texture_id_ by value so this callback does
+  // not depend on WebviewBridge staying alive. The callback may fire from the
+  // capture thread slightly after ~WebviewBridge begins, so it must not touch
+  // any member via `this`.
   texture_bridge_->SetOnFrameAvailable(
-      [this]() { texture_registrar_->MarkTextureFrameAvailable(texture_id_); });
+      [registrar = texture_registrar_, id = texture_id_]() {
+        registrar->MarkTextureFrameAvailable(id);
+      });
 
   const auto method_channel_name =
       std::format("io.jns.webview.win/{}", texture_id_);
@@ -212,11 +218,35 @@ WebviewBridge::WebviewBridge(flutter::BinaryMessenger* messenger,
 }
 
 WebviewBridge::~WebviewBridge() {
+  // Stop the capture pipeline first so no new frames can arrive and call
+  // MarkTextureFrameAvailable while we are dismantling the bridge.
   if (texture_bridge_) {
     texture_bridge_->Stop();
   }
 
-  texture_registrar_->UnregisterTexture(texture_id_);
+  // Destroy the webview itself. This kills the underlying WebView2 browser
+  // process and its Visual, so no new FrameArrived events will be dispatched
+  // by the capture source after this returns.
+  webview_.reset();
+
+  // Tear down the method/event channels synchronously. These are only ever
+  // touched on the platform thread, so it is safe to free them here.
+  method_channel_.reset();
+  event_channel_.reset();
+  event_sink_.reset();
+
+  // Unregister the texture asynchronously and keep flutter_texture_ and
+  // texture_bridge_ alive until Flutter confirms the raster thread has
+  // released its reference to the ObtainDescriptor callback. Without this,
+  // the raster thread could call into a freed TextureBridgeGpu.
+  std::shared_ptr<flutter::TextureVariant> tex(std::move(flutter_texture_));
+  std::shared_ptr<TextureBridge> bridge(std::move(texture_bridge_));
+
+  texture_registrar_->UnregisterTexture(
+      texture_id_, [tex = std::move(tex), bridge = std::move(bridge)]() {
+        // tex and bridge are freed here, after Flutter has guaranteed the
+        // raster thread will no longer invoke the descriptor callback.
+      });
 }
 
 void WebviewBridge::RegisterEventHandlers() {
@@ -375,8 +405,7 @@ void WebviewBridge::RegisterEventHandlers() {
          flutter::EncodableValue("processFailed")},
         {flutter::EncodableValue(kEventValue),
          flutter::EncodableValue(flutter::EncodableMap{
-             {flutter::EncodableValue("kind"),
-              flutter::EncodableValue(kind)},
+             {flutter::EncodableValue("kind"), flutter::EncodableValue(kind)},
              {flutter::EncodableValue("reason"),
               flutter::EncodableValue(reason)},
          })}});
