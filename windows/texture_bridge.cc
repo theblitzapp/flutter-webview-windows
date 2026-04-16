@@ -37,8 +37,22 @@ TextureBridge::TextureBridge(GraphicsContext* graphics_context,
 TextureBridge::~TextureBridge() {
   const std::lock_guard<std::mutex> lock(mutex_);
   StopInternal();
+
+  // Safety net; owners should call ReleaseCaptureItem() on the creating
+  // thread first. Releasing here may stall on cross-apartment COM marshaling.
   if (capture_item_) {
     capture_item_->remove_Closed(on_closed_token_);
+    on_closed_token_ = {};
+    capture_item_ = nullptr;
+  }
+}
+
+void TextureBridge::ReleaseCaptureItem() {
+  const std::lock_guard<std::mutex> lock(mutex_);
+
+  if (capture_item_) {
+    capture_item_->remove_Closed(on_closed_token_);
+    on_closed_token_ = {};
     capture_item_ = nullptr;
   }
 }

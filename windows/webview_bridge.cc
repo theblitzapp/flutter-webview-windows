@@ -222,6 +222,10 @@ WebviewBridge::~WebviewBridge() {
   // MarkTextureFrameAvailable while we are dismantling the bridge.
   if (texture_bridge_) {
     texture_bridge_->Stop();
+    // Drop the apartment-affine capture item on this (UI) thread. Deferring
+    // to the async UnregisterTexture callback below would release it on an
+    // engine worker thread and deadlock during shutdown.
+    texture_bridge_->ReleaseCaptureItem();
   }
 
   // Destroy the webview itself. This kills the underlying WebView2 browser

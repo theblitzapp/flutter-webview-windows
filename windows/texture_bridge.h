@@ -29,6 +29,11 @@ class TextureBridge {
   bool Start();
   void Stop();
 
+  // Releases the apartment-affine GraphicsCaptureItem. Must be called on
+  // the thread that constructed the bridge; otherwise COM marshaling the
+  // final Release back to the creating STA can deadlock during shutdown.
+  void ReleaseCaptureItem();
+
   void SetOnFrameAvailable(FrameAvailableCallback callback) {
     frame_available_ = std::move(callback);
   }
