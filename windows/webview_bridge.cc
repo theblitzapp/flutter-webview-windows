@@ -1107,7 +1107,11 @@ void WebviewBridge::HandleMethodCall(
                 if (success) {
                   shared_result->Success(flutter::EncodableValue(json_result));
                 } else {
-                  shared_result->Error(kMethodFailed, "CDP method failed.");
+                  shared_result->Error(
+                      kMethodFailed, "CDP method failed.",
+                      flutter::EncodableValue(json_result.empty()
+                                                  ? std::string("{}")
+                                                  : json_result));
                 }
               });
           return;
