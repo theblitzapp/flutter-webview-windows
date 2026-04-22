@@ -603,6 +603,11 @@ void WebviewBridge::HandleMethodCall(
                                static_cast<size_t>(height),
                                static_cast<float>(scale_factor));
 
+      if (auto* gpu_bridge =
+              static_cast<TextureBridgeGpu*>(texture_bridge_.get())) {
+        gpu_bridge->SetOutputScale(static_cast<float>(scale_factor));
+      }
+
       texture_bridge_->Start();
 
       // Immediately notify the Flutter engine that the texture has changed.
